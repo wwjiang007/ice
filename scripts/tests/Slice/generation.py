@@ -4,13 +4,13 @@ class SliceGenerationTestCase(ClientTestCase):
         current.write("testing list-generated... ")
 
         slice2java = SliceTranslator("slice2java")
-        self.mkdirs("classes")
+        current.mkdirs("classes")
 
         slice2java.run(current,
                        args=["--list-generated", "--output-dir", "classes", "File1.ice", "File2.ice"] +
                        (["--compat"] if current.testcase.getPath().find("java-compat") >= 0 else []))
 
-        lines1 = slice2java.getOutput().strip().split("\n")
+        lines1 = slice2java.getOutput(current).strip().split("\n")
         lines2 = open(os.path.join(self.getPath(), "list-generated.out"), "r").readlines()
         if len(lines1) != len(lines2):
             raise RuntimeError("failed!")

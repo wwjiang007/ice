@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -15,7 +15,7 @@
 #include <IceBT/StreamSocket.h>
 
 #include <Ice/Transceiver.h>
-#include <IceUtil/UniquePtr.h>
+#include <Ice/UniquePtr.h>
 
 namespace IceBT
 {
@@ -56,7 +56,7 @@ private:
     std::string _addr;
     std::string _uuid;
     bool _needConnect;
-    IceUtil::UniquePtr<Ice::Exception> _exception;
+    IceInternal::UniquePtr<Ice::Exception> _exception;
     IceUtil::Monitor<IceUtil::Mutex> _lock;
 
     void connectCompleted(int, const ConnectionPtr&);

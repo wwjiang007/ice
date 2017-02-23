@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -8,6 +8,7 @@
 // **********************************************************************
 
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
@@ -85,15 +86,27 @@ public class TestI : TestIntfDisp_
     }
 
     override public void
-    close(bool force, Ice.Current current)
+    close(CloseMode mode, Ice.Current current)
     {
-        current.con.close(force);
+        current.con.close((Ice.ConnectionClose)((int)mode));
+    }
+
+    override public void
+    sleep(int ms, Ice.Current current)
+    {
+        Thread.Sleep(ms);
     }
 
     override public void
     shutdown(Ice.Current current)
     {
         current.adapter.getCommunicator().shutdown();
+    }
+
+    override public bool
+    supportsAMD(Ice.Current current)
+    {
+        return true;
     }
 
     override public bool
@@ -133,7 +146,32 @@ public class TestI : TestIntfDisp_
         return TestIntfPrxHelper.uncheckedCast(current.adapter.createProxy(current.id));
     }
 
+    override public Task
+    startDispatchAsync(Ice.Current current)
+    {
+        lock(this)
+        {
+            TaskCompletionSource<object> t = new TaskCompletionSource<object>();
+            _pending.Add(t);
+            return t.Task;
+        }
+    }
+
+    override public void
+    finishDispatch(Ice.Current current)
+    {
+        lock(this)
+        {
+            foreach(TaskCompletionSource<object> t in _pending)
+            {
+                t.SetResult(null);
+            }
+        }
+        _pending.Clear();
+    }
+
     private int _batchCount;
+    private List<TaskCompletionSource<object>> _pending = new List<TaskCompletionSource<object>>();
 }
 
 public class TestControllerI : TestIntfControllerDisp_

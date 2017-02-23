@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -78,19 +78,13 @@ namespace Ice
         }
 
         /// <summary>
-        /// Initializes an instance that calls Communicator.shutdown if a signal is received.
-        /// </summary>
-        public Application()
-        {
-        }
-
-        /// <summary>
         /// Initializes an instance that handles signals according to the signal policy.
+        /// If not signal policy is provided the default SinalPolicy.NoSignalHandling 
+        /// will be used, which calls Communicator.shutdown if a signal is received.
         /// </summary>
         /// <param name="signalPolicy">Determines how to respond to signals.</param>
-        public Application(SignalPolicy signalPolicy)
+        public Application(SignalPolicy signalPolicy = SignalPolicy.NoSignalHandling)
         {
-            iceSignalPolicy = signalPolicy;
         }
 
         /// <summary>

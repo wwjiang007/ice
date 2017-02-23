@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -164,15 +164,7 @@ public class AllTests
             //initData.properties.setProperty("Ice.Trace.Network", "2");
             _communicator = _app.initialize(initData);
 
-            _thread = new Thread(
-                new Runnable()
-                {
-                    public void
-                    run()
-                    {
-                        TestCase.this.run();
-                    }
-                });
+            _thread = new Thread(() -> { TestCase.this.run(); });
         }
 
         public void start()
@@ -568,6 +560,31 @@ public class AllTests
         }
     }
 
+    static class HeartbeatManualTest extends TestCase
+    {
+        public HeartbeatManualTest(Application app, RemoteCommunicatorPrx com, java.io.PrintWriter out)
+        {
+            super(app, "manual heartbeats", com, out);
+            //
+            // Disable heartbeats.
+            //
+            setClientACM(10, -1, 0);
+            setServerACM(10, -1, 0);
+        }
+
+        public void runTestCase(RemoteObjectAdapterPrx adapter, TestIntfPrx proxy)
+        {
+            proxy.startHeartbeatCount();
+            com.zeroc.Ice.Connection con = proxy.ice_getConnection();
+            con.heartbeat();
+            con.heartbeat();
+            con.heartbeat();
+            con.heartbeat();
+            con.heartbeat();
+            proxy.waitForHeartbeatCount(5);
+        }
+    }
+
     static class SetACMTest extends TestCase
     {
         public SetACMTest(Application app, RemoteCommunicatorPrx com, java.io.PrintWriter out)
@@ -600,7 +617,8 @@ public class AllTests
             test(acm.heartbeat == ACMHeartbeat.HeartbeatAlways);
 
             // Make sure the client sends few heartbeats to the server
-            proxy.waitForHeartbeat(2);
+            proxy.startHeartbeatCount();
+            proxy.waitForHeartbeatCount(2);
         }
     }
 
@@ -627,6 +645,7 @@ public class AllTests
 
         tests.add(new HeartbeatOnIdleTest(app, com, out));
         tests.add(new HeartbeatAlwaysTest(app, com, out));
+        tests.add(new HeartbeatManualTest(app, com, out));
         tests.add(new SetACMTest(app, com, out));
 
         for(TestCase test : tests)

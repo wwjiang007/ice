@@ -1,6 +1,6 @@
 # **********************************************************************
 #
-# Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+# Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 #
 # This copy of Ice is licensed to you under the terms described in the
 # ICE_LICENSE file included in this distribution.
@@ -18,9 +18,9 @@ project = $(patsubst $(lang_srcdir)/%,%,$(if $1,$1,$(currentdir)))
 #
 # The platforms, configs and languages to build.
 #
-platforms 		= $(if $(filter all,$(PLATFORMS)),$(supported-platforms),$(PLATFORMS))
-configs 		= $(if $(filter all,$(CONFIGS)),$(supported-configs),$(CONFIGS))
-languages 		= $(if $(filter all,$(or $(LANGUAGES),all)),$(supported-languages),$(LANGUAGES))
+platforms 		= $(filter-out $(SKIP),$(if $(filter all,$(PLATFORMS)),$(supported-platforms),$(PLATFORMS)))
+configs 		= $(filter-out $(SKIP),$(if $(filter all,$(CONFIGS)),$(supported-configs),$(CONFIGS)))
+languages 		= $(filter-out $(SKIP),$(if $(filter all,$(or $(LANGUAGES),all)),$(supported-languages),$(LANGUAGES)))
 build-platform		:= $(or $(build-platform),$(firstword $(supported-platforms)))
 
 #
@@ -189,8 +189,11 @@ endef
 define make-flex
 $1/%.cpp: $1/%.l
 	@$(RM) $$@
-	echo '#include <IceUtil/ScannerConfig.h>' >> $$@
-	flex -t $2 $$< >> $$@
+	flex $2 -o $$@ $$<
+	@$(MV) $$@ $$@.tail
+	@echo '#include <IceUtil/ScannerConfig.h>' >> $$@
+	@cat $$@.tail >> $$@
+	@$(RM) $$@.tail
 endef
 
 
@@ -805,6 +808,7 @@ $1_targetdir	:= $(call bindir,$1)
 # Only build the translator with the static configuration
 #
 $1_configs	:= static
+$1_platforms    := $(build-platform)
 $(notdir $1)_always_enable_configs := static
 $(notdir $1)_always_enable_platforms := $(build-platform)
 
@@ -835,8 +839,8 @@ endef
 #
 # Create the targets for the given projects and then make the project rules.
 #
-make-projects = $(foreach p,$1,$(eval $(call $(or $3,create-project-targets),$p)))\
-		$(foreach p,$1,$(eval $(call $(or $2,make-project),$p)))
+make-projects = $(foreach p,$1,$(eval $(call $(or $(if $($p_type),create-$($p_type)-project-targets),$3,create-project-targets),$p)))\
+		$(foreach p,$1,$(eval $(call $(or $(if $($p_type),make-$($p_type)-project),$2,make-project),$p)))
 
 #
 # $(call depend_cppflags,$1=dependencyfile,$2=targetfile)
@@ -876,9 +880,8 @@ mappingdir  	= $(patsubst $(lang_srcdir)/%,%,$(if $(filter-out ../%,$1),$2,$(top
 # $(call subconfigs,$1=config)
 subconfigs = $(subst -,$(space),$1)
 
-# $(call var-names,$1=varname,$2=project,$3=component,$4=platform,$5=config)
-var-names = $(if $3,$3[$4-$5]_$1 $3[$4]_$1 $(foreach c,$(call subconfigs,$5),$3[$c]_$1) $3_$1) \
-	    $2[$4-$5]_$1 $2[$4]_$1 $(foreach c,$(call subconfigs,$5),$2[$c]_$1) $2_$1
+# $(call var-names,$1=varname,$2=comp,$3=platform,$4=config)
+var-names = $(if $2,$2[$3-$4]_$1 $2[$3]_$1 $(foreach c,$(call subconfigs,$4),$2[$c]_$1) $2_$1)
 
 #
 # $(call var-value,$1=varname,$2=project,$3=component,$4=platform,$5=config,$6=fn)
@@ -890,14 +893,16 @@ var-names = $(if $3,$3[$4-$5]_$1 $3[$4]_$1 $(foreach c,$(call subconfigs,$5),$3[
 #
 var-valu1 = $(if $(and $1,$(filter undefined,$(origin $(firstword $1)))),$(call var-valu1,$(wordlist 2,$(words $1),$1)),$($(firstword $1)))
 var-valu2 = $6
-var-value = $(call $(or $6,var-valu2),$1,$3,$4,$5,$3[$4-$5],$(call var-valu1,$(var-names)))
+var-value-names = $(call var-names,$1,$3,$4,$5) $(call var-names,$1,$2,$4,$5) $1
+var-value = $(call $(or $6,var-valu2),$1,$3,$4,$5,$3[$4-$5],$(call var-valu1,$(var-value-names)))
 
 #
 # $(call var-compound,$1=varname,$2=project,$3=component,$4=platform,$5=config,$6=fn)
 # Returns the combination of all the values for the given variable name defined at the
-# project/component /platform/configuration level.
+# project/component/platform/configuration level.
 #
-var-compound 	= $(call $(or $6,var-valu2),$1,$3,$4,$5,$3[$4-$5],$(strip $(foreach v,$(var-names),$($v))))
+var-comp-names  = $1 $(call var-names,$1,$2,$4,$5) $(call var-names,$1,$3,$4,$5)
+var-compound 	= $(call $(or $6,var-valu2),$1,$3,$4,$5,$3[$4-$5],$(strip $(foreach v,$(var-comp-names),$($v))))
 
 #
 # Return the given value after applying platform/configuration customization.
@@ -1032,7 +1037,7 @@ static_ldflags		+= $$(call unique,$$(foreach d,$$(call get-all-deps,$4),$$(call 
 
 # Shared configuration for shared builds
 shared_projects		= %
-shared_objdir		= $(if $(filter-out program,$($1_target)),shared/pic,shared/nopic)
+shared_objdir		= $(if $(filter-out program,$($1_target)),shared/pic,shared/pie)
 shared_targetrule	= $(if $(filter-out program,$($1_target)),shared)
 shared_cppflags		+= $(strip $(call make-lib-cppflags,$4))
 shared_ldflags		+= $$(call unique,$$(foreach d,$($4_dependencies),$$(call make-shared-dep-ldflags,$$d,$4)))\

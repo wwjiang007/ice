@@ -11,12 +11,13 @@
     <BuildWithPhpVersion>7.0</BuildWithPhpVersion>
 
     <!-- Determines whether the extension uses PHP namespaces (requires PHP 5.3 or later). -->
-    <PhpUseNamespaces>no</PhpUseNamespaces>
+    <PhpUseNamespaces Condition="'$(PhpUseNamespaces)' == ''">yes</PhpUseNamespaces>
   </PropertyGroup>
 
   <PropertyGroup>
-      <IceBuilderPhpProps Condition="!Exists('$(IceBuilderPhpProps)')">$([System.IO.Directory]::GetFiles('$(LocalAppData)\Microsoft\VisualStudio\$(VisualStudioVersion)\Extensions', 'IceBuilder.Php.props', SearchOption.AllDirectories))</IceBuilderPhpProps>
-      <IceBuilderPhpTargets Condition="!Exists('$(IceBuilderPhpTargets)')">$([System.IO.Directory]::GetFiles('$(LocalAppData)\Microsoft\VisualStudio\$(VisualStudioVersion)\Extensions', 'IceBuilder.Php.targets', SearchOption.AllDirectories))</IceBuilderPhpTargets>
+      <IceBuilderInstallDir>$([MSBuild]::GetRegistryValue('HKEY_CURRENT_USER\SOFTWARE\ZeroC\IceBuilder', 'InstallDir.$(VisualStudioVersion)'))</IceBuilderInstallDir>
+      <IceBuilderPhpProps>$(IceBuilderInstallDir)\Resources\IceBuilder.Php.props</IceBuilderPhpProps>
+      <IceBuilderPhpTargets>$(IceBuilderInstallDir)\Resources\IceBuilder.Php.targets</IceBuilderPhpTargets>
   </PropertyGroup>
 
   <ItemGroup>
@@ -50,7 +51,7 @@
       <PreprocessorDefinitions>ICEPHP_USE_NAMESPACES;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
   </ItemDefinitionGroup>
-  <PropertyGroup Condition="'$(PhpUseNamespaces)' == 'yes'">
-    <IceBuilderNamespace>yes</IceBuilderNamespace>
+  <PropertyGroup Condition="'$(PhpUseNamespaces)' == 'no'">
+    <IceBuilderAdditionalOptions>--no-namespace</IceBuilderAdditionalOptions>
   </PropertyGroup>
 </Project>

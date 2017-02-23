@@ -1,6 +1,6 @@
 # **********************************************************************
 #
-# Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+# Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 #
 # This copy of Ice is licensed to you under the terms described in the
 # ICE_LICENSE file included in this distribution.
@@ -24,12 +24,15 @@ class IceStorm(ProcessFromBinDir, Server):
 
     def setup(self, current):
         # Create the database directory
-        os.mkdir(os.path.join(current.testcase.getPath(), "{0}-{1}.db".format(self.instanceName, self.replica)))
+        self.dbdir = os.path.join(current.testcase.getPath(), "{0}-{1}.db".format(self.instanceName, self.replica))
+        if os.path.exists(self.dbdir):
+            shutil.rmtree(self.dbdir)
+        os.mkdir(self.dbdir)
 
     def teardown(self, current, success):
         # Remove the database directory tree
         try:
-            shutil.rmtree(os.path.join(current.testcase.getPath(), "{0}-{1}.db".format(self.instanceName, self.replica)))
+            shutil.rmtree(self.dbdir)
         except:
             pass
 
@@ -204,7 +207,7 @@ class IceStormTestCase(TestCase):
     def runadmin(self, current, cmd, instanceName=None, instance=None, exitstatus=0, quiet=False):
         admin = IceStormAdmin(instanceName, instance, args=["-e", cmd], quiet=quiet)
         admin.run(current, exitstatus=exitstatus)
-        return admin.getOutput()
+        return admin.getOutput(current)
 
     def getTopicManager(self, current, instanceName=None):
         if not instanceName:

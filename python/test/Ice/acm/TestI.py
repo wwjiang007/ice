@@ -1,6 +1,6 @@
 # **********************************************************************
 #
-# Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+# Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 #
 # This copy of Ice is licensed to you under the terms described in the
 # ICE_LICENSE file included in this distribution.
@@ -9,7 +9,22 @@
 
 import Ice, Test, threading
 
-class RemoteCommunicatorI(Test.RemoteCommunicator):
+class ConnectionCallbackI():
+    def __init__(self):
+        self.m = threading.Condition()
+        self.count = 0
+
+    def heartbeat(self, con):
+        with self.m:
+            self.count += 1
+            self.m.notifyAll()
+
+    def waitForCount(self, count):
+        with self.m:
+            while self.count < count:
+                self.m.wait()
+
+class RemoteCommunicatorI(Test._RemoteCommunicatorDisp):
     def createObjectAdapter(self, timeout, close, heartbeat, current=None):
         com = current.adapter.getCommunicator()
         properties = com.getProperties()
@@ -29,7 +44,7 @@ class RemoteCommunicatorI(Test.RemoteCommunicator):
     def shutdown(self, current=None):
         current.adapter.getCommunicator().shutdown()
 
-class RemoteObjectAdapterI(Test.RemoteObjectAdapter):
+class RemoteObjectAdapterI(Test._RemoteObjectAdapterDisp):
     def __init__(self, adapter):
         self._adapter = adapter
         self._testIntf = Test.TestIntfPrx.uncheckedCast(adapter.add(TestIntfI(),
@@ -51,7 +66,7 @@ class RemoteObjectAdapterI(Test.RemoteObjectAdapter):
         except Ice.ObjectAdapterDeactivatedException:
             pass
 
-class TestIntfI(Test.TestIntf):
+class TestIntfI(Test._TestIntfDisp):
     def __init__(self):
         self.m = threading.Condition()
 
@@ -68,26 +83,9 @@ class TestIntfI(Test.TestIntf):
         with self.m:
             self.m.notifyAll()
 
-    def waitForHeartbeat(self, count, current=None):
+    def startHeartbeatCount(self, current=None):
+        self.callback = ConnectionCallbackI()
+        current.con.setHeartbeatCallback(lambda con: self.callback.heartbeat(con))
 
-        class ConnectionCallbackI():
-
-            def __init__(self):
-                self.m = threading.Condition()
-                self.count = 0
-
-            def heartbeat(self, con):
-                with self.m:
-                    self.count -= 1
-                    self.m.notifyAll()
-
-            def waitForCount(self, count):
-                with self.m:
-                    self.count = count
-                    while self.count > 0:
-                        self.m.wait()
-
-        callback = ConnectionCallbackI()
-        current.con.setHeartbeatCallback(lambda con: callback.heartbeat(con))
-        callback.waitForCount(2)
-
+    def waitForHeartbeatCount(self, count, current=None):
+        self.callback.waitForCount(2)

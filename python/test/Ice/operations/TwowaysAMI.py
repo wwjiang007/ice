@@ -1,6 +1,6 @@
 # **********************************************************************
 #
-# Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+# Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 #
 # This copy of Ice is licensed to you under the terms described in the
 # ICE_LICENSE file included in this distribution.
@@ -757,7 +757,7 @@ def twowaysAMI(communicator, p):
     cb.check()
 
     cb = Callback()
-    p.begin_ice_isA(Test.MyClass.ice_staticId(), cb.isA, cb.exCB)
+    p.begin_ice_isA(Test._MyClassDisp.ice_staticId(), cb.isA, cb.exCB)
     cb.check()
 
     cb = Callback()
@@ -1101,7 +1101,7 @@ def twowaysAMI(communicator, p):
     test(c != ctx)
 
     test(len(p.ice_getContext()) == 0)
-    r = p.begin_opContext(_ctx=ctx)
+    r = p.begin_opContext(context=ctx)
     c = p.end_opContext(r)
     test(c == ctx)
 
@@ -1111,7 +1111,7 @@ def twowaysAMI(communicator, p):
     c = p2.end_opContext(r)
     test(c == ctx)
 
-    r = p2.begin_opContext(_ctx=ctx)
+    r = p2.begin_opContext(context=ctx)
     c = p2.end_opContext(r)
     test(c == ctx)
 

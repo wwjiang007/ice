@@ -1,6 +1,6 @@
 # **********************************************************************
 #
-# Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+# Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 #
 # This copy of Ice is licensed to you under the terms described in the
 # ICE_LICENSE file included in this distribution.
@@ -8,7 +8,7 @@
 # **********************************************************************
 
 top_srcdir	:= ..
-lang_srcdir	:= $(top_srcdir)/php
+lang_srcdir	:= $(top_srcdir)/$(notdir $(patsubst %/,%,$(dir $(abspath $(lastword $(MAKEFILE_LIST))))))
 
 include $(top_srcdir)/config/Make.rules
 
@@ -48,7 +48,12 @@ $(call make-projects,$(projects))
 
 install:: | $(DESTDIR)$(install_phpdir)
 	$(E) "Installing generated code"
-	$(Q)$(INSTALL) lib/*.php $(DESTDIR)$(install_phpdir)
+	$(Q)$(INSTALL) lib/Glacier2.php  lib/IceBox.php  lib/IceGrid.php lib/IcePatch2.php lib/IceStorm.php $(DESTDIR)$(install_phpdir)
+ifeq ($(USE_NAMESPACES),no)
+	$(Q)$(INSTALL) lib/Ice_no_ns.php $(DESTDIR)$(install_phpdir)/Ice.php
+else
+	$(Q)$(INSTALL) lib/Ice_ns.php $(DESTDIR)$(install_phpdir)/Ice.php
+endif
 
 $(eval $(call make-php-package,$(slicedir),lib,Ice))
 $(eval $(call make-php-package,$(slicedir),lib,Glacier2))

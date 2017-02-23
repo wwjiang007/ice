@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -11,6 +11,8 @@
 #include <IceUtil/CtrlCHandler.h>
 #include <IceUtil/Mutex.h>
 #include <IceUtil/MutexPtrLock.h>
+#include <IceUtil/ConsoleUtil.h>
+
 #include <Slice/Preprocessor.h>
 #include <Slice/FileTracker.h>
 #include <Slice/Util.h>
@@ -18,6 +20,7 @@
 
 using namespace std;
 using namespace Slice;
+using namespace IceUtilInternal;
 
 namespace
 {
@@ -56,8 +59,8 @@ interruptedCallback(int /*signal*/)
 void
 usage(const string& n)
 {
-    getErrorStream() << "Usage: " << n << " [options] slice-files...\n";
-    getErrorStream() <<
+    consoleErr << "Usage: " << n << " [options] slice-files...\n";
+    consoleErr <<
         "Options:\n"
         "-h, --help               Show this message.\n"
         "-v, --version            Display the Ice version.\n"
@@ -123,7 +126,7 @@ compile(const vector<string>& argv)
     }
     catch(const IceUtilInternal::BadOptException& e)
     {
-        getErrorStream() << argv[0] << ": " << e.reason << endl;
+        consoleErr << argv[0] << ": " << e.reason << endl;
         if(!validate)
         {
             usage(argv[0]);
@@ -139,7 +142,7 @@ compile(const vector<string>& argv)
 
     if(opts.isSet("version"))
     {
-        getErrorStream() << ICE_STRING_VERSION << endl;
+        consoleErr << ICE_STRING_VERSION << endl;
         return EXIT_SUCCESS;
     }
 
@@ -196,7 +199,7 @@ compile(const vector<string>& argv)
 
     if(args.empty())
     {
-        getErrorStream() << argv[0] << ": error: no input file" << endl;
+        consoleErr << argv[0] << ": error: no input file" << endl;
         if(!validate)
         {
             usage(argv[0]);
@@ -206,7 +209,7 @@ compile(const vector<string>& argv)
 
     if(depend && dependxml)
     {
-        getErrorStream() << argv[0] << ": error: cannot specify both --depend and --depend-xml" << endl;
+        consoleErr << argv[0] << ": error: cannot specify both --depend and --depend-xml" << endl;
         if(!validate)
         {
             usage(argv[0]);
@@ -216,7 +219,7 @@ compile(const vector<string>& argv)
 
     if(implCpp98 && implCpp11)
     {
-        getErrorStream() << argv[0] << ": error: cannot specify both --impl-c++98 and --impl-c++11" << endl;
+        consoleErr << argv[0] << ": error: cannot specify both --impl-c++98 and --impl-c++11" << endl;
         if(!validate)
         {
             usage(argv[0]);
@@ -234,10 +237,10 @@ compile(const vector<string>& argv)
     IceUtil::CtrlCHandler ctrlCHandler;
     ctrlCHandler.setCallback(interruptedCallback);
 
-    DependOutputUtil out(dependFile);
+    ostringstream os;
     if(dependxml)
     {
-        out.os() << "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<dependencies>" << endl;
+        os << "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<dependencies>" << endl;
     }
 
     for(vector<string>::const_iterator i = args.begin(); i != args.end(); ++i)
@@ -258,30 +261,37 @@ compile(const vector<string>& argv)
 
             if(cppHandle == 0)
             {
-                out.cleanup();
                 return EXIT_FAILURE;
             }
 
             UnitPtr u = Unit::createUnit(false, false, ice, underscore);
             int parseStatus = u->parse(*i, cppHandle, debug);
+
+            string ext = headerExtension;
+            static const string headerExtPrefix = "cpp:header-ext:";
+            DefinitionContextPtr dc = u->findDefinitionContext(u->topLevelFile());
+            assert(dc);
+            string meta = dc->findMetaData(headerExtPrefix);
+            if(meta.size() > headerExtPrefix.size())
+            {
+                ext = meta.substr(headerExtPrefix.size());
+            }
+
             u->destroy();
 
             if(parseStatus == EXIT_FAILURE)
             {
-                out.cleanup();
                 return EXIT_FAILURE;
             }
 
-            if(!icecpp->printMakefileDependencies(out.os(), depend ? Preprocessor::CPlusPlus : Preprocessor::SliceXML,
-                                                  includePaths, "-D__SLICE2CPP__", sourceExtension, headerExtension))
+            if(!icecpp->printMakefileDependencies(os, depend ? Preprocessor::CPlusPlus : Preprocessor::SliceXML,
+                                                  includePaths, "-D__SLICE2CPP__", sourceExtension, ext))
             {
-                out.cleanup();
                 return EXIT_FAILURE;
             }
 
             if(!icecpp->close())
             {
-                out.cleanup();
                 return EXIT_FAILURE;
             }
         }
@@ -298,7 +308,7 @@ compile(const vector<string>& argv)
             if(preprocess)
             {
                 char buf[4096];
-                while(fgets(buf, static_cast<int>(sizeof(buf)), cppHandle) != NULL)
+                while(fgets(buf, static_cast<int>(sizeof(buf)), cppHandle) != ICE_NULLPTR)
                 {
                     if(fputs(buf, stdout) == EOF)
                     {
@@ -339,7 +349,7 @@ compile(const vector<string>& argv)
                         // cleanup any created files.
                         FileTracker::instance()->cleanup();
                         u->destroy();
-                        getErrorStream() << argv[0] << ": error: " << ex.reason() << endl;
+                        consoleErr << argv[0] << ": error: " << ex.reason() << endl;
                         return EXIT_FAILURE;
                     }
                 }
@@ -353,7 +363,6 @@ compile(const vector<string>& argv)
 
             if(interrupted)
             {
-                out.cleanup();
                 FileTracker::instance()->cleanup();
                 return EXIT_FAILURE;
             }
@@ -362,7 +371,12 @@ compile(const vector<string>& argv)
 
     if(dependxml)
     {
-        out.os() << "</dependencies>\n";
+        os << "</dependencies>\n";
+    }
+
+    if(depend || dependxml)
+    {
+        writeDependencies(os.str(), dependFile);
     }
 
     return status;
@@ -381,22 +395,22 @@ int main(int argc, char* argv[])
     }
     catch(const std::exception& ex)
     {
-        getErrorStream() << args[0] << ": error:" << ex.what() << endl;
+        consoleErr << args[0] << ": error:" << ex.what() << endl;
         return EXIT_FAILURE;
     }
     catch(const std::string& msg)
     {
-        getErrorStream() << args[0] << ": error:" << msg << endl;
+        consoleErr << args[0] << ": error:" << msg << endl;
         return EXIT_FAILURE;
     }
     catch(const char* msg)
     {
-        getErrorStream() << args[0] << ": error:" << msg << endl;
+        consoleErr << args[0] << ": error:" << msg << endl;
         return EXIT_FAILURE;
     }
     catch(...)
     {
-        getErrorStream() << args[0] << ": error:" << "unknown exception" << endl;
+        consoleErr << args[0] << ": error:" << "unknown exception" << endl;
         return EXIT_FAILURE;
     }
 }

@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -226,7 +226,7 @@ public class AllTests : TestCommon.AllTests
 
         try
         {
-            b1 = communicator.stringToProxy("test:tcp@adapterId");
+            communicator.stringToProxy("test:tcp@adapterId");
             test(false);
         }
         catch(Ice.EndpointParseException)
@@ -244,7 +244,37 @@ public class AllTests : TestCommon.AllTests
         //}
         try
         {
-            b1 = communicator.stringToProxy("test::tcp");
+            communicator.stringToProxy("test: :tcp");
+            test(false);
+        }
+        catch(Ice.EndpointParseException)
+        {
+        }
+
+        //
+        // Test invalid endpoint syntax
+        //
+        try
+        {
+            communicator.createObjectAdapterWithEndpoints("BadAdapter", " : ");
+            test(false);
+        }
+        catch(Ice.EndpointParseException)
+        {
+        }
+
+        try
+        {
+            communicator.createObjectAdapterWithEndpoints("BadAdapter", "tcp: ");
+            test(false);
+        }
+        catch(Ice.EndpointParseException)
+        {
+        }
+
+        try
+        {
+            communicator.createObjectAdapterWithEndpoints("BadAdapter", ":tcp");
             test(false);
         }
         catch(Ice.EndpointParseException)
@@ -332,6 +362,26 @@ public class AllTests : TestCommon.AllTests
         test(idStr == "greek \\360\\220\\205\\252/banana \\016-\\360\\237\\215\\214\\342\\202\\254\\302\\242$");
         test(id.Equals(id2));
 
+        WriteLine("ok");
+
+        Write("testing proxyToString... ");
+        Flush();
+        b1 = communicator.stringToProxy(rf);
+        Ice.ObjectPrx b2 = communicator.stringToProxy(communicator.proxyToString(b1));
+        test(b1.Equals(b2));
+
+        if(b1.ice_getConnection() != null) // not colloc-optimized target
+        {
+            b2 = b1.ice_getConnection().createProxy(Ice.Util.stringToIdentity("fixed"));
+            String str = communicator.proxyToString(b2);
+            test(b2.ToString() == str);
+            String str2 = b1.ice_identity(b2.ice_getIdentity()).ice_secure(b2.ice_isSecure()).ToString();
+
+            // Verify that the stringified fixed proxy is the same as a regular stringified proxy
+            // but without endpoints
+            test(str2.StartsWith(str));
+            test(str2[str.Length] == ':');
+        }
         WriteLine("ok");
 
         Write("testing propertyToProxy... ");
@@ -850,7 +900,7 @@ public class AllTests : TestCommon.AllTests
         try
         {
             // Invalid -x option
-            communicator.stringToProxy("id:opaque -t 99 -v abc -x abc");
+            communicator.stringToProxy("id:opaque -t 99 -v abcd -x abc");
             test(false);
         }
         catch(Ice.EndpointParseException)
@@ -870,7 +920,7 @@ public class AllTests : TestCommon.AllTests
         try
         {
             // Repeated -t
-            communicator.stringToProxy("id:opaque -t 1 -t 1 -v abc");
+            communicator.stringToProxy("id:opaque -t 1 -t 1 -v abcd");
             test(false);
         }
         catch(Ice.EndpointParseException)
@@ -880,7 +930,7 @@ public class AllTests : TestCommon.AllTests
         try
         {
             // Repeated -v
-            communicator.stringToProxy("id:opaque -t 1 -v abc -v abc");
+            communicator.stringToProxy("id:opaque -t 1 -v abcd -v abcd");
             test(false);
         }
         catch(Ice.EndpointParseException)
@@ -890,7 +940,7 @@ public class AllTests : TestCommon.AllTests
         try
         {
             // Missing -t
-            communicator.stringToProxy("id:opaque -v abc");
+            communicator.stringToProxy("id:opaque -v abcd");
             test(false);
         }
         catch(Ice.EndpointParseException)
@@ -910,7 +960,7 @@ public class AllTests : TestCommon.AllTests
         try
         {
             // Missing arg for -t
-            communicator.stringToProxy("id:opaque -t -v abc");
+            communicator.stringToProxy("id:opaque -t -v abcd");
             test(false);
         }
         catch(Ice.EndpointParseException)
@@ -930,7 +980,7 @@ public class AllTests : TestCommon.AllTests
         try
         {
             // Not a number for -t
-            communicator.stringToProxy("id:opaque -t x -v abc");
+            communicator.stringToProxy("id:opaque -t x -v abcd");
             test(false);
         }
         catch(Ice.EndpointParseException)
@@ -940,7 +990,7 @@ public class AllTests : TestCommon.AllTests
         try
         {
             // < 0 for -t
-            communicator.stringToProxy("id:opaque -t -1 -v abc");
+            communicator.stringToProxy("id:opaque -t -1 -v abcd");
             test(false);
         }
         catch(Ice.EndpointParseException)
@@ -951,6 +1001,16 @@ public class AllTests : TestCommon.AllTests
         {
             // Invalid char for -v
             communicator.stringToProxy("id:opaque -t 99 -v x?c");
+            test(false);
+        }
+        catch(Ice.EndpointParseException)
+        {
+        }
+
+        try
+        {
+            // Invalid lenght for base64 input
+            communicator.stringToProxy("id:opaque -t 99 -v xc");
             test(false);
         }
         catch(Ice.EndpointParseException)

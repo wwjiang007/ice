@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # **********************************************************************
 #
-# Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+# Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 #
 # This copy of Ice is licensed to you under the terms described in the
 # ICE_LICENSE file included in this distribution.
@@ -19,7 +19,7 @@ if not slice_dir:
 Ice.loadSlice("'-I" + slice_dir + "' Test.ice")
 import Test
 
-class ServerLocatorRegistry(Test.TestLocatorRegistry):
+class ServerLocatorRegistry(Test._TestLocatorRegistryDisp):
     def __init__(self):
         self._adapters = {}
         self._objects = {}
@@ -56,7 +56,7 @@ class ServerLocatorRegistry(Test.TestLocatorRegistry):
             raise Ice.ObjectNotFoundException()
         return self._objects[id]
 
-class ServerLocator(Test.TestLocator):
+class ServerLocator(Test._TestLocatorDisp):
 
     def __init__(self, registry, registryPrx):
         self._registry = registry
@@ -77,7 +77,7 @@ class ServerLocator(Test.TestLocator):
     def getRequestCount(self, current=None):
         return self._requestCount
 
-class ServerManagerI(Test.ServerManager):
+class ServerManagerI(Test._ServerManagerDisp):
     def __init__(self, registry, initData):
         self._registry = registry
         self._communicators = []
@@ -89,7 +89,7 @@ class ServerManagerI(Test.ServerManager):
         self._initData.properties.setProperty("TestAdapter2.AdapterId", "TestAdapter2")
 
     def startServer(self, current=None):
-      
+
         #
         # Simulate a server: create a new communicator and object
         # adapter. The object adapter is started on a system allocated
@@ -121,11 +121,11 @@ class ServerManagerI(Test.ServerManager):
             i.destroy()
         current.adapter.getCommunicator().shutdown()
 
-class HelloI(Test.Hello):
+class HelloI(Test._HelloDisp):
     def sayHello(self, current=None):
         pass
 
-class TestI(Test.TestIntf):
+class TestI(Test._TestIntfDisp):
     def __init__(self, adapter, adapter2, registry):
         self._adapter1 = adapter
         self._adapter2 = adapter2
@@ -183,17 +183,10 @@ def run(args, communicator, initData):
 try:
     initData = Ice.InitializationData()
     initData.properties = Ice.createProperties(sys.argv)
-    communicator = Ice.initialize(sys.argv, initData)
-    status = run(sys.argv, communicator, initData)
+    with Ice.initialize(sys.argv, initData) as communicator:
+        status = run(sys.argv, communicator, initData)
 except:
     traceback.print_exc()
     status = False
-
-if communicator:
-    try:
-        communicator.destroy()
-    except:
-        traceback.print_exc()
-        status = False
 
 sys.exit(not status)

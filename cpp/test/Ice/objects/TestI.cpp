@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -55,7 +55,7 @@ EI::EI() :
 }
 
 bool
-EI::checkValues(const Ice::Current&)
+EI::checkValues()
 {
     return i == 1 && s == "hello";
 }
@@ -70,7 +70,7 @@ FI::FI(const EPtr& e) :
 }
 
 bool
-FI::checkValues(const Ice::Current&)
+FI::checkValues()
 {
     return e1 && e1 == e2;
 }
@@ -315,7 +315,7 @@ UnexpectedObjectExceptionTestI::ice_invoke(const std::vector<Ice::Byte>&,
 {
     Ice::CommunicatorPtr communicator = current.adapter->getCommunicator();
     Ice::OutputStream out(communicator);
-    out.startEncapsulation(current.encoding, Ice::DefaultFormat);
+    out.startEncapsulation(current.encoding, Ice::ICE_ENUM(FormatType, DefaultFormat));
     AlsoEmptyPtr obj = ICE_MAKE_SHARED(AlsoEmpty);
     out.write(obj);
     out.writePendingValues();

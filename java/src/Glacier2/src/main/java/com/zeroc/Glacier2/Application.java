@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -274,8 +274,8 @@ public abstract class Application extends com.zeroc.Ice.Application
 
         try
         {
-            Util.InitializeResult ir = Util.initialize(args, initData);
-            _communicator = ir.communicator;
+            java.util.List<String> remainingArgs = new java.util.ArrayList<>();
+            _communicator = Util.initialize(args, initData, remainingArgs);
 
             _router = com.zeroc.Glacier2.RouterPrx.uncheckedCast(communicator().getDefaultRouter());
             if(_router == null)
@@ -331,7 +331,7 @@ public abstract class Application extends com.zeroc.Ice.Application
                         connection.setCloseCallback(con -> sessionDestroyed());
                     }
                     _category = _router.getCategoryForClient();
-                    r.returnValue = runWithSession(ir.args);
+                    r.returnValue = runWithSession(remainingArgs.toArray(new String[remainingArgs.size()]));
                 }
             }
         }
@@ -455,20 +455,7 @@ public abstract class Application extends com.zeroc.Ice.Application
 
         if(_communicator != null)
         {
-            try
-            {
-                _communicator.destroy();
-            }
-            catch(com.zeroc.Ice.LocalException ex)
-            {
-                Util.getProcessLogger().error(Ex.toString(ex));
-                r.returnValue = 1;
-            }
-            catch(java.lang.Exception ex)
-            {
-                Util.getProcessLogger().error("unknown exception:\n" + Ex.toString(ex));
-                r.returnValue = 1;
-            }
+            _communicator.destroy();
             _communicator = null;
         }
 

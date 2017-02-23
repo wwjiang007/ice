@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -118,13 +118,13 @@ versionToString(PyObject* args, const char* type)
     PyObject* p;
     if(!PyArg_ParseTuple(args, STRCAST("O!"), versionType, &p))
     {
-        return NULL;
+        return ICE_NULLPTR;
     }
 
     T v;
     if(!getVersion<T>(p, v, type))
     {
-        return NULL;
+        return ICE_NULLPTR;
     }
 
     string s;
@@ -135,7 +135,7 @@ versionToString(PyObject* args, const char* type)
     catch(const Ice::Exception& ex)
     {
         IcePy::setPythonException(ex);
-        return NULL;
+        return ICE_NULLPTR;
     }
     return createString(s);
 }
@@ -146,7 +146,7 @@ stringToVersion(PyObject* args, const char* type)
     char* str;
     if(!PyArg_ParseTuple(args, STRCAST("s"), &str))
     {
-        return NULL;
+        return ICE_NULLPTR;
     }
 
     T v;
@@ -157,7 +157,7 @@ stringToVersion(PyObject* args, const char* type)
     catch(const Ice::Exception& ex)
     {
         IcePy::setPythonException(ex);
-        return NULL;
+        return ICE_NULLPTR;
     }
 
     return createVersion<T>(v, type);
@@ -856,6 +856,10 @@ convertLocalException(const Ice::LocalException& ex, PyObject* p)
     {
         IcePy::PyObjectHandle m = IcePy::createString(e.reason);
         PyObject_SetAttrString(p, STRCAST("reason"), m.get());
+    }
+    catch(const Ice::ConnectionManuallyClosedException& e)
+    {
+        PyObject_SetAttrString(p, STRCAST("graceful"), e.graceful ? IcePy::getTrue() : IcePy::getFalse());
     }
     catch(const Ice::LocalException&)
     {

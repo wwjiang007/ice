@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -63,41 +63,10 @@ class ACMConfig
     }
 }
 
-class ACMMonitor
-{
-    add(con)
-    {
-        Debug.assert(false); // Abstract
-    }
-
-    remove(con)
-    {
-        Debug.assert(false); // Abstract
-    }
-
-    reap(con)
-    {
-        Debug.assert(false); // Abstract
-    }
-
-    acm(timeout)
-    {
-        Debug.assert(false); // Abstract
-        return null;
-    }
-
-    getACM()
-    {
-        Debug.assert(false); // Abstract
-        return 0;
-    }
-}
-
-class FactoryACMMonitor extends ACMMonitor
+class FactoryACMMonitor
 {
     constructor(instance, config)
     {
-        super();
         this._instance = instance;
         this._config = config;
         this._reapedConnections = [];
@@ -225,11 +194,10 @@ class FactoryACMMonitor extends ACMMonitor
     }
 }
 
-class ConnectionACMMonitor extends ACMMonitor
+class ConnectionACMMonitor
 {
     constructor(parent, timer, config)
     {
-        super();
         this._parent = parent;
         this._timer = timer;
         this._config = config;

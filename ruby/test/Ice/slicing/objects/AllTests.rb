@@ -1,6 +1,6 @@
 # **********************************************************************
 #
-# Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+# Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 #
 # This copy of Ice is licensed to you under the terms described in the
 # ICE_LICENSE file included in this distribution.
@@ -110,7 +110,7 @@ def allTests(communicator)
     begin
         o = t.SUnknownAsObject()
         test(t.ice_getEncodingVersion() != Ice::Encoding_1_0)
-        test(o.is_a?(Ice::UnknownSlicedObject))
+        test(o.is_a?(Ice::UnknownSlicedValue))
         test(o.unknownTypeId == "::Test::SUnknown")
         test(o._ice_slicedData != nil)
         t.checkSUnknown(o)

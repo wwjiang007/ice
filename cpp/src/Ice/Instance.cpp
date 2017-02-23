@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -43,6 +43,7 @@
 #include <Ice/RegisterPluginsInit.h>
 #include <Ice/ObserverHelper.h>
 #include <Ice/Functional.h>
+#include <Ice/ConsoleUtil.h>
 
 #include <IceUtil/DisableWarnings.h>
 #include <IceUtil/FileUtil.h>
@@ -141,16 +142,16 @@ public:
 
             if(notDestroyedCount > 0)
             {
-                cerr << "!! " << IceUtil::Time::now().toDateTime() << " error: ";
+                consoleErr << "!! " << IceUtil::Time::now().toDateTime() << " error: ";
                 if(notDestroyedCount == 1)
                 {
-                    cerr << "communicator ";
+                    consoleErr << "communicator ";
                 }
                 else
                 {
-                    cerr << notDestroyedCount << " communicators ";
+                    consoleErr << notDestroyedCount << " communicators ";
                 }
-                cerr << "not destroyed during global destruction.";
+                consoleErr << "not destroyed during global destruction.";
             }
 
             delete instanceList;
@@ -230,7 +231,7 @@ Timer::updateObserver(const Ice::Instrumentation::CommunicatorObserverPtr& obsv)
     assert(obsv);
     _observer.attach(obsv->getThreadObserver("Communicator",
                                             "Ice.Timer",
-                                            Ice::Instrumentation::ThreadStateIdle,
+                                            Instrumentation::ICE_ENUM(ThreadState, ThreadStateIdle),
                                             _observer.get()));
     _hasObserver.exchange(_observer.get() ? 1 : 0);
 }
@@ -247,8 +248,8 @@ Timer::runTimerTask(const IceUtil::TimerTaskPtr& task)
         }
         if(threadObserver)
         {
-            threadObserver->stateChanged(Ice::Instrumentation::ThreadStateIdle,
-                                         Ice::Instrumentation::ThreadStateInUseForOther);
+            threadObserver->stateChanged(Instrumentation::ICE_ENUM(ThreadState, ThreadStateIdle),
+                                         Instrumentation::ICE_ENUM(ThreadState, ThreadStateInUseForOther));
         }
         try
         {
@@ -258,14 +259,14 @@ Timer::runTimerTask(const IceUtil::TimerTaskPtr& task)
         {
             if(threadObserver)
             {
-                threadObserver->stateChanged(Ice::Instrumentation::ThreadStateInUseForOther,
-                                             Ice::Instrumentation::ThreadStateIdle);
+                threadObserver->stateChanged(Instrumentation::ICE_ENUM(ThreadState, ThreadStateInUseForOther),
+                                             Instrumentation::ICE_ENUM(ThreadState, ThreadStateIdle));
             }
         }
         if(threadObserver)
         {
-            threadObserver->stateChanged(Ice::Instrumentation::ThreadStateInUseForOther,
-                                         Ice::Instrumentation::ThreadStateIdle);
+            threadObserver->stateChanged(Instrumentation::ICE_ENUM(ThreadState, ThreadStateInUseForOther),
+                                         Instrumentation::ICE_ENUM(ThreadState, ThreadStateIdle));
         }
     }
     else
@@ -1521,9 +1522,9 @@ IceInternal::Instance::finishSetup(int& argc, char* argv[], const Ice::Communica
     if(printProcessId)
     {
 #ifdef _MSC_VER
-        cout << GetCurrentProcessId() << endl;
+        consoleOut << GetCurrentProcessId() << endl;
 #else
-        cout << getpid() << endl;
+        consoleOut << getpid() << endl;
 #endif
     }
 
@@ -1930,12 +1931,12 @@ IceInternal::ProcessI::writeMessage(const string& message, Int fd, const Current
     {
         case 1:
         {
-            cout << message << endl;
+            consoleOut << message << endl;
             break;
         }
         case 2:
         {
-            cerr << message << endl;
+            consoleErr << message << endl;
             break;
         }
     }

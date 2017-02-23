@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 # **********************************************************************
 #
-# Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+# Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 #
 # This copy of Ice is licensed to you under the terms described in the
 # ICE_LICENSE file included in this distribution.
@@ -27,7 +27,7 @@ class IceGridDistributionTestCase(IceGridTestCase):
         ]
 
         current.write("creating IcePatch2 data directory... ")
-        self.mkdirs(datadir)
+        current.mkdirs(datadir)
 
         for [file, content] in files:
             file = os.path.join(datadir, file)

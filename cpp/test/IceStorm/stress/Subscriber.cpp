@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -163,7 +163,7 @@ public:
         if(!_done && (IceUtilInternal::random(10) == 1 || ++_count == _total))
         {
             _done = true;
-            current.con->close(true);
+            current.con->close(ICE_SCOPED_ENUM(ConnectionClose, Forcefully));
             // Deactivate the OA. This ensures that the subscribers
             // that have subscribed with oneway QoS will be booted.
             current.adapter->deactivate();
@@ -529,15 +529,7 @@ main(int argc, char* argv[])
 
     if(communicator)
     {
-        try
-        {
-            communicator->destroy();
-        }
-        catch(const Exception& ex)
-        {
-            cerr << ex << endl;
-            status = EXIT_FAILURE;
-        }
+        communicator->destroy();
     }
 
     return status;

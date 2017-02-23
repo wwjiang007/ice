@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -9,7 +9,10 @@
 
 #pragma once
 
+[["suppress-warning:deprecated"]] // For classes with operations
+
 ["objc:prefix:TestObjects"]
+
 module Test
 {
 
@@ -23,6 +26,17 @@ class Base
     S theS;
     string str;
 };
+
+exception BaseEx
+{
+    string reason;
+};
+
+class AbstractBase extends Base
+{
+    void op();
+};
+
 
 class B;
 class C;
@@ -63,16 +77,12 @@ class D
 {
     int i;
     string s;
-
-    bool checkValues();
 };
 
 class F
 {
     ["protected"] E e1;
     E e2;
-
-    bool checkValues();
 };
 
 interface I
@@ -214,6 +224,12 @@ class Initial
     ObjectPrxDict getObjectPrxDict(ObjectPrxDict d);
     BaseDict getBaseDict(BaseDict d);
     BasePrxDict getBasePrxDict(BasePrxDict d);
+};
+
+interface TestIntf
+{
+    Base opDerived();
+    void throwDerived() throws BaseEx;
 };
 
 class Empty

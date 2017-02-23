@@ -1,6 +1,6 @@
 ﻿// **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -85,15 +85,7 @@ namespace TestCommon
 
             if(_communicator != null)
             {
-                try
-                {
-                    _communicator.destroy();
-                }
-                catch(Exception ex)
-                {
-                    Console.Out.WriteLine(_testName + ": " + ex);
-                    status = 1;
-                }
+                _communicator.destroy();
                 _communicator = null;
             }
             return status;

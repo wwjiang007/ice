@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 # **********************************************************************
 #
-# Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+# Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 #
 # This copy of Ice is licensed to you under the terms described in the
 # ICE_LICENSE file included in this distribution.
@@ -21,13 +21,13 @@ class SliceErrorDetectionTestCase(ClientTestCase):
         for file in files:
             current.write(os.path.basename(file) + "... ")
 
-            args = ["-I.", file]
+            args = ["-I.", file, "--output-dir", "tmp"]
             if file.find("Underscore") >= 0:
                 args.append("--underscore")
 
             # Don't print out slice2cpp output and expect failures
-            slice2cpp.run(current, args=args, exitstatus=1)
-            output = slice2cpp.getOutput()
+            slice2cpp.run(current, args=args, exitstatus=0 if file.find("Warning") >= 0 else 1)
+            output = slice2cpp.getOutput(current)
 
             regex1 = re.compile("\.ice$", re.IGNORECASE)
             lines1 = output.strip().split("\n")

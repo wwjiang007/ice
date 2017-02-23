@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -111,7 +111,7 @@
                         //
                         test(batchCount === 0);
                         b1.opBatch();
-                        b1.ice_getCachedConnection().close(false);
+                        b1.ice_getCachedConnection().close(Ice.ConnectionClose.GracefullyWithWait);
                         return communicator.flushBatchRequests().then(() => p.opBatchCount());
                     }
                 ).then(batchCount =>
@@ -156,7 +156,7 @@
                                 b2 = prx;
                                 b1.opBatch();
                                 b2.opBatch();
-                                b1.ice_getCachedConnection().close(false);
+                                b1.ice_getCachedConnection().close(Ice.ConnectionClose.GracefullyWithWait);
                                 return communicator.flushBatchRequests();
                             }
                         ).then(() => p.waitForBatch(1)
@@ -181,8 +181,8 @@
                                 b2 = prx;
                                 b1.opBatch();
                                 b2.opBatch();
-                                b1.ice_getCachedConnection().close(false);
-                                b2.ice_getCachedConnection().close(false);
+                                b1.ice_getCachedConnection().close(Ice.ConnectionClose.GracefullyWithWait);
+                                b2.ice_getCachedConnection().close(Ice.ConnectionClose.GracefullyWithWait);
                                 return communicator.flushBatchRequests();
                             }
                         ).then(() => p.opBatchCount());

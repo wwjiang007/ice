@@ -1,6 +1,6 @@
 # **********************************************************************
 #
-# Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+# Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 #
 # This copy of Ice is licensed to you under the terms described in the
 # ICE_LICENSE file included in this distribution.
@@ -58,6 +58,8 @@ class Executor:
                 raise
             except:
                 pass
+            finally:
+                current.destroy()
             results.put((result, mainThread))
             if not result.isSuccess() and not self.continueOnFailure:
                 with self.lock: self.failure = True
@@ -289,9 +291,9 @@ class LocalDriver(Driver):
             self.total = total
 
     @classmethod
-    def getOptions(self):
+    def getSupportedArgs(self):
         return ("", ["cross=", "workers=", "continue", "loop", "start=", "all", "all-cross", "host=",
-                     "client=", "server="])
+                     "client=", "server=", "show-durations"])
 
     @classmethod
     def usage(self):
@@ -306,6 +308,7 @@ class LocalDriver(Driver):
         print("--all-cross           Run all sensible permutations of cross language tests.")
         print("--client=<proxy>      The endpoint of the controller to run the client side.")
         print("--server=<proxy>      The endpoint of the controller to run the server side.")
+        print("--show-durations      Print out the duration of each tests.")
 
     def __init__(self, options, *args, **kargs):
         Driver.__init__(self, options, *args, **kargs)
@@ -317,6 +320,7 @@ class LocalDriver(Driver):
         self.loop = False
         self.start = 0
         self.all = False
+        self.showDurations = False
 
         self.clientCtlPrx = ""
         self.serverCtlPrx = ""
@@ -325,7 +329,8 @@ class LocalDriver(Driver):
                                       "l" : "loop",
                                       "all-cross" : "allCross",
                                       "client" : "clientCtlPrx",
-                                      "server" : "serverCtlPrx" })
+                                      "server" : "serverCtlPrx",
+                                      "show-durations" : "showDurations" })
 
         if self.cross:
             self.cross = Mapping.getByName(self.cross)
@@ -335,17 +340,13 @@ class LocalDriver(Driver):
         self.results = []
         self.threadlocal = threading.local()
 
-        try:
-            if self.clientCtlPrx or self.serverCtlPrx:
-                self.initCommunicator()
-                self.runner = RemoteTestCaseRunner(self.communicator, self.clientCtlPrx, self.serverCtlPrx)
-            else:
-                self.runner = TestCaseRunner()
-        except:
-            self.destroy()
-            raise
-
     def run(self, mappings, testSuiteIds):
+
+        if self.clientCtlPrx or self.serverCtlPrx:
+            self.initCommunicator()
+            self.runner = RemoteTestCaseRunner(self.communicator, self.clientCtlPrx, self.serverCtlPrx)
+        else:
+            self.runner = TestCaseRunner()
 
         while True:
             executor = Executor(self.threadlocal, self.workers, self.continueOnFailure)
@@ -358,7 +359,7 @@ class LocalDriver(Driver):
                 runOrder = mapping.getRunOrder()
                 def testsuiteKey(testsuite):
                     for k in runOrder:
-                        if testsuite.getId().startswith(k + os.sep):
+                        if testsuite.getId().startswith(k + '/'):
                             return testsuite.getId().replace(k, str(runOrder.index(k)))
                     return testsuite.getId()
                 testsuites = sorted(testsuites, key=testsuiteKey)
@@ -391,6 +392,11 @@ class LocalDriver(Driver):
                 print("Ran {0} tests in {1} minutes {2:02.2f} seconds".format(len(results), m, s))
             else:
                 print("Ran {0} tests in {1:02.2f} seconds".format(len(results), s))
+
+            if self.showDurations:
+                for r in sorted(results, key = lambda r : r.getDuration()):
+                    print("- {0} took {1:02.2f} seconds".format(r.testsuite, r.getDuration()))
+
             if len(failures) > 0:
                 print("{0} succeeded and {1} failed:".format(len(results) - len(failures), len(failures)))
                 for r in failures:
@@ -424,7 +430,8 @@ class LocalDriver(Driver):
                         current.config = conf
                         testcase.run(current)
                 except:
-                    print(traceback.format_exc())
+                    if current.driver.debug:
+                        current.result.writeln(traceback.format_exc())
                     raise
                 finally:
                     current.config = config

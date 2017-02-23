@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -19,21 +19,21 @@ public class Fallback extends javax.swing.JApplet
         try
         {
             java.net.URL jar  = Fallback.class.getProtectionDomain().getCodeSource().getLocation();
-            
+
             java.util.List<String> command = new java.util.ArrayList<>();
             command.add("java");
             command.add("-cp");
             command.add(jar.toURI().getPath());
             command.add("com.zeroc.IceGridGUI.Main");
-            
+
             String[] args = MainProxy.args();
             for(String arg : args)
             {
                 command.add(arg);
             }
-            
+
             ProcessBuilder pb = new ProcessBuilder(command);
-            
+
             final Process p = pb.start();
             if(p != null)
             {
@@ -56,7 +56,7 @@ public class Fallback extends javax.swing.JApplet
                     }
                 });
             }
-            
+
             //
             // Exit from the JApplet after we have lauch IceGridGUI
             //
@@ -65,9 +65,9 @@ public class Fallback extends javax.swing.JApplet
         catch(Exception ex)
         {
             ex.printStackTrace();
-            JOptionPane.showMessageDialog(null, 
-                                          "Exception trying to start IceGrid Admin from Fallback class",
-                                          "IceGrid Admin Error", 
+            JOptionPane.showMessageDialog(null,
+                                          "Exception trying to start IceGrid GUI from Fallback class",
+                                          "IceGrid GUI Error",
                                           JOptionPane.ERROR_MESSAGE);
             //
             // Exit from the JApplet after we have lauch IceGridGUI

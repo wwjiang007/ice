@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -611,6 +611,18 @@ public final class ObjectAdapterI implements ObjectAdapter
     }
 
     @Override
+    public synchronized Endpoint[]
+    getEndpoints()
+    {
+        List<Endpoint> endpoints = new ArrayList<Endpoint>();
+        for(IncomingConnectionFactory factory : _incomingConnectionFactories)
+        {
+            endpoints.add(factory.endpoint());
+        }
+        return endpoints.toArray(new Endpoint[0]);
+    }
+
+    @Override
     public void
     refreshPublishedEndpoints()
     {
@@ -648,22 +660,51 @@ public final class ObjectAdapterI implements ObjectAdapter
 
     @Override
     public synchronized Endpoint[]
-    getEndpoints()
-    {
-        List<Endpoint> endpoints = new ArrayList<Endpoint>();
-        for(IncomingConnectionFactory factory : _incomingConnectionFactories)
-        {
-            endpoints.add(factory.endpoint());
-        }
-        return endpoints.toArray(new Endpoint[0]);
-    }
-
-    @Override
-    public synchronized Endpoint[]
     getPublishedEndpoints()
     {
         return _publishedEndpoints.toArray(new Endpoint[0]);
     }
+
+    @Override
+    public void
+    setPublishedEndpoints(Endpoint[] newEndpoints)
+    {
+        List<IceInternal.EndpointI> newPublishedEndpoints = new ArrayList<>(newEndpoints.length);
+        for(Endpoint e: newEndpoints)
+        {
+            newPublishedEndpoints.add((IceInternal.EndpointI)e);
+        }
+
+        IceInternal.LocatorInfo locatorInfo = null;
+        List<IceInternal.EndpointI> oldPublishedEndpoints;
+
+        synchronized(this)
+        {
+            checkForDeactivation();
+            oldPublishedEndpoints = _publishedEndpoints;
+            _publishedEndpoints = newPublishedEndpoints;
+            locatorInfo = _locatorInfo;
+        }
+
+        try
+        {
+            Ice.Identity dummy = new Identity();
+            dummy.name = "dummy";
+            updateLocatorRegistry(locatorInfo, createDirectProxy(dummy));
+        }
+        catch(Ice.LocalException ex)
+        {
+            synchronized(this)
+            {
+                //
+                // Restore the old published endpoints.
+                //
+                _publishedEndpoints = oldPublishedEndpoints;
+                throw ex;
+            }
+        }
+    }
+
 
     public boolean
     isLocal(ObjectPrx proxy)
@@ -746,7 +787,7 @@ public final class ObjectAdapterI implements ObjectAdapter
     }
 
     public void
-    flushAsyncBatchRequests(IceInternal.CommunicatorFlushBatch outAsync)
+    flushAsyncBatchRequests(Ice.CompressBatch compressBatch, IceInternal.CommunicatorFlushBatch outAsync)
     {
         List<IncomingConnectionFactory> f;
         synchronized(this)
@@ -755,7 +796,7 @@ public final class ObjectAdapterI implements ObjectAdapter
         }
         for(IncomingConnectionFactory p : f)
         {
-            p.flushAsyncBatchRequests(outAsync);
+            p.flushAsyncBatchRequests(compressBatch, outAsync);
         }
     }
 
@@ -1211,6 +1252,10 @@ public final class ObjectAdapterI implements ObjectAdapter
             beg = IceUtilInternal.StringUtil.findFirstNotOf(endpts, delim, end);
             if(beg == -1)
             {
+                if(!endpoints.isEmpty())
+                {
+                    throw new EndpointParseException("invalid empty object adapter endpoint");
+                }
                 break;
             }
 
@@ -1259,17 +1304,14 @@ public final class ObjectAdapterI implements ObjectAdapter
 
             if(end == beg)
             {
-                ++end;
-                continue;
+                throw new EndpointParseException("invalid empty object adapter endpoint");
             }
 
             String s = endpts.substring(beg, end);
             IceInternal.EndpointI endp = _instance.endpointFactoryManager().create(s, oaEndpoints);
             if(endp == null)
             {
-                Ice.EndpointParseException e = new Ice.EndpointParseException();
-                e.str = "invalid object adapter endpoint `" + s + "'";
-                throw e;
+                throw new Ice.EndpointParseException("invalid object adapter endpoint `" + s + "'");
             }
             endpoints.add(endp);
 

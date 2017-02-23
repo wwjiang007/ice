@@ -1,6 +1,6 @@
 # **********************************************************************
 #
-# Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+# Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 #
 # This copy of Ice is licensed to you under the terms described in the
 # ICE_LICENSE file included in this distribution.
@@ -13,11 +13,11 @@ def test(b):
     if not b:
         raise RuntimeError('test assertion failed')
 
-class TestFacetI(Test.TestFacet):
+class TestFacetI(Test._TestFacetDisp):
     def op(self, current = None):
         return
 
-class RemoteCommunicatorI(Test.RemoteCommunicator, Ice.PropertiesAdminUpdateCallback):
+class RemoteCommunicatorI(Test._RemoteCommunicatorDisp, Ice.PropertiesAdminUpdateCallback):
     def __init__(self, communicator):
         self.communicator = communicator
         self.called = False
@@ -61,7 +61,7 @@ class RemoteCommunicatorI(Test.RemoteCommunicator, Ice.PropertiesAdminUpdateCall
             self.called = True
             self.m.notify()
 
-class RemoteCommunicatorFactoryI(Test.RemoteCommunicatorFactory):
+class RemoteCommunicatorFactoryI(Test._RemoteCommunicatorFactoryDisp):
 
     def createCommunicator(self, props, current = None):
         #

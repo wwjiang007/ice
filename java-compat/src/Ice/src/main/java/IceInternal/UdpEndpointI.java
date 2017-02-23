@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -157,6 +157,25 @@ final class UdpEndpointI extends IPEndpointI
     {
         return new UdpEndpointI(_instance, _host, transceiver.effectivePort(), _sourceAddr, _mcastInterface,_mcastTtl,
                                 _connect, _connectionId, _compress);
+    }
+
+    @Override
+    public void initWithOptions(java.util.ArrayList<String> args, boolean oaEndpoint)
+    {
+        super.initWithOptions(args, oaEndpoint);
+
+        if(_mcastInterface.equals("*"))
+        {
+            if(oaEndpoint)
+            {
+                _mcastInterface = "";
+            }
+            else
+            {
+                throw new Ice.EndpointParseException("`--interface *' not valid for proxy endpoint `" +
+                                                     toString() + "'");
+            }
+        }
     }
 
     //

@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -10,7 +10,6 @@
 #import <objc/Ice.h>
 #import <TestCommon.h>
 #import <ProxyTest.h>
-
 
 TestProxyMyClassPrx*
 proxyAllTests(id<ICECommunicator> communicator)
@@ -411,7 +410,7 @@ proxyAllTests(id<ICECommunicator> communicator)
     tprintf("ok\n");
 
     tprintf("testing proxy methods... ");
-    test([[communicator identityToString:[[base ice_identity:[communicator stringToIdentity:@"other"]] ice_getIdentity]]
+    test([[communicator identityToString:[[base ice_identity:[ICEUtil stringToIdentity:@"other"]] ice_getIdentity]]
              isEqualToString:@"other"]);
 
     //

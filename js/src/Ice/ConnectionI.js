@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -35,6 +35,7 @@ const InputStream = Ice.InputStream;
 const OutputStream = Ice.OutputStream;
 const BatchRequestQueue = Ice.BatchRequestQueue;
 const ConnectionFlushBatch = Ice.ConnectionFlushBatch;
+const HeartbeatAsync = Ice.HeartbeatAsync;
 const Debug = Ice.Debug;
 const ExUtil = Ice.ExUtil;
 const HashMap = Ice.HashMap;
@@ -49,6 +50,7 @@ const EncodingVersion = Ice.EncodingVersion;
 const ACM = Ice.ACM;
 const ACMClose = Ice.ACMClose;
 const ACMHeartbeat = Ice.ACMHeartbeat;
+const ConnectionClose = Ice.ConnectionClose;
 
 const StateNotInitialized = 0;
 const StateNotValidated = 1;
@@ -65,7 +67,6 @@ class MessageInfo
         this.stream = new InputStream(instance, Protocol.currentProtocolEncoding);
         this.invokeNum = 0;
         this.requestId = 0;
-        this.compress = false;
         this.servantManager = null;
         this.adapter = null;
         this.outAsync = null;
@@ -218,23 +219,26 @@ class ConnectionI
         }
     }
 
-    close(force)
+    close(mode)
     {
         const r = new AsyncResultBase(this._communicator, "close", this, null, null);
 
-        if(force)
+        if(mode == ConnectionClose.Forcefully)
         {
-            this.setState(StateClosed, new Ice.ForcedCloseConnectionException());
+            this.setState(StateClosed, new Ice.ConnectionManuallyClosedException(false));
+            r.resolve();
+        }
+        else if(mode == ConnectionClose.Gracefully)
+        {
+            this.setState(StateClosing, new Ice.ConnectionManuallyClosedException(true));
             r.resolve();
         }
         else
         {
+            Debug.assert(mode == ConnectionClose.GracefullyWithWait);
+
             //
-            // If we do a graceful shutdown, then we wait until all
-            // outstanding requests have been completed. Otherwise,
-            // the CloseConnectionException will cause all outstanding
-            // requests to be retried, regardless of whether the
-            // server has processed them or not.
+            // Wait until all outstanding requests have been completed.
             //
             this._closePromises.push(r);
             this.checkClose();
@@ -246,13 +250,13 @@ class ConnectionI
     checkClose()
     {
         //
-        // If close(false) has been called, then we need to check if all
+        // If close(GracefullyWithWait) has been called, then we need to check if all
         // requests have completed and we can transition to StateClosing.
         // We also complete outstanding promises.
         //
         if(this._asyncRequests.size === 0 && this._closePromises.length > 0)
         {
-            this.setState(StateClosing, new Ice.CloseConnectionException());
+            this.setState(StateClosing, new Ice.ConnectionManuallyClosedException(true));
             this._closePromises.forEach(p => p.resolve());
             this._closePromises = [];
         }
@@ -310,13 +314,13 @@ class ConnectionI
         // We send a heartbeat if there was no activity in the last
         // (timeout / 4) period. Sending a heartbeat sooner than
         // really needed is safer to ensure that the receiver will
-        // receive in time the heartbeat. Sending the heartbeat if
+        // receive the heartbeat in time. Sending the heartbeat if
         // there was no activity in the last (timeout / 2) period
         // isn't enough since monitor() is called only every (timeout
         // / 2) period.
         //
         // Note that this doesn't imply that we are sending 4 heartbeats
-        // per timeout period because the monitor() method is sill only
+        // per timeout period because the monitor() method is still only
         // called every (timeout / 2) period.
         //
         if(acm.heartbeat == Ice.ACMHeartbeat.HeartbeatAlways ||
@@ -325,7 +329,7 @@ class ConnectionI
         {
             if(acm.heartbeat != Ice.ACMHeartbeat.HeartbeatOnInvocation || this._dispatchCount > 0)
             {
-                this.heartbeat(); // Send heartbeat if idle in the last timeout / 2 period.
+                this.sendHeartbeatNow(); // Send heartbeat if idle in the last timeout / 2 period.
             }
         }
 
@@ -362,7 +366,7 @@ class ConnectionI
         }
     }
 
-    sendAsyncRequest(out, compress, response, batchRequestNum)
+    sendAsyncRequest(out, response, batchRequestNum)
     {
         let requestId = 0;
         const ostr = out.getOs();
@@ -419,7 +423,7 @@ class ConnectionI
         let status;
         try
         {
-            status = this.sendMessage(OutgoingMessage.create(out, out.getOs(), compress, requestId));
+            status = this.sendMessage(OutgoingMessage.create(out, out.getOs(), requestId));
         }
         catch(ex)
         {
@@ -486,6 +490,13 @@ class ConnectionI
     setHeartbeatCallback(callback)
     {
         this._heartbeatCallback = callback;
+    }
+
+    heartbeat()
+    {
+        const result = new HeartbeatAsync(this, this._communicator);
+        result.invoke();
+        return result;
     }
 
     setACM(timeout, close, heartbeat)
@@ -560,7 +571,7 @@ class ConnectionI
         }
     }
 
-    sendResponse(os, compressFlag)
+    sendResponse(os)
     {
         Debug.assert(this._state > StateNotValidated);
 
@@ -581,7 +592,7 @@ class ConnectionI
                 throw this._exception;
             }
 
-            this.sendMessage(OutgoingMessage.createForStream(os, compressFlag !== 0, true));
+            this.sendMessage(OutgoingMessage.createForStream(os, true));
 
             if(this._state === StateClosing && this._dispatchCount === 0)
             {
@@ -915,8 +926,7 @@ class ConnectionI
 
             if(info.invokeNum > 0)
             {
-                this.invokeAll(info.stream, info.invokeNum, info.requestId, info.compress, info.servantManager,
-                            info.adapter);
+                this.invokeAll(info.stream, info.invokeNum, info.requestId, info.servantManager, info.adapter);
 
                 //
                 // Don't increase count, the dispatch count is
@@ -1008,7 +1018,7 @@ class ConnectionI
                 // Trace the cause of unexpected connection closures
                 //
                 if(!(this._exception instanceof Ice.CloseConnectionException ||
-                     this._exception instanceof Ice.ForcedCloseConnectionException ||
+                     this._exception instanceof Ice.ConnectionManuallyClosedException ||
                      this._exception instanceof Ice.ConnectionTimeoutException ||
                      this._exception instanceof Ice.CommunicatorDestroyedException ||
                      this._exception instanceof Ice.ObjectAdapterDeactivatedException))
@@ -1211,7 +1221,7 @@ class ConnectionI
                     // Don't warn about certain expected exceptions.
                     //
                     if(!(this._exception instanceof Ice.CloseConnectionException ||
-                         this._exception instanceof Ice.ForcedCloseConnectionException ||
+                         this._exception instanceof Ice.ConnectionManuallyClosedException ||
                          this._exception instanceof Ice.ConnectionTimeoutException ||
                          this._exception instanceof Ice.CommunicatorDestroyedException ||
                          this._exception instanceof Ice.ObjectAdapterDeactivatedException ||
@@ -1416,15 +1426,13 @@ class ConnectionI
 
     initiateShutdown()
     {
-        Debug.assert(this._state === StateClosing);
-        Debug.assert(this._dispatchCount === 0);
+        Debug.assert(this._state === StateClosing && this._dispatchCount === 0);
         Debug.assert(!this._shutdownInitiated);
 
         if(!this._endpoint.datagram())
         {
             //
-            // Before we shut down, we send a close connection
-            // message.
+            // Before we shut down, we send a close connection message.
             //
             const os = new OutputStream(this._instance, Protocol.currentProtocolEncoding);
             os.writeBlob(Protocol.magic);
@@ -1434,7 +1442,7 @@ class ConnectionI
             os.writeByte(0); // compression status: always report 0 for CloseConnection.
             os.writeInt(Protocol.headerSize); // Message size.
 
-            if((this.sendMessage(OutgoingMessage.createForStream(os, false, false)) & AsyncStatus.Sent) > 0)
+            if((this.sendMessage(OutgoingMessage.createForStream(os, false)) & AsyncStatus.Sent) > 0)
             {
                 //
                 // Schedule the close timeout to wait for the peer to close the connection.
@@ -1454,7 +1462,7 @@ class ConnectionI
         }
     }
 
-    heartbeat()
+    sendHeartbeatNow()
     {
         Debug.assert(this._state === StateActive);
 
@@ -1469,7 +1477,7 @@ class ConnectionI
             os.writeInt(Protocol.headerSize); // Message size.
             try
             {
-                this.sendMessage(OutgoingMessage.createForStream(os, false, false));
+                this.sendMessage(OutgoingMessage.createForStream(os, false));
             }
             catch(ex)
             {
@@ -1759,8 +1767,8 @@ class ConnectionI
             //
             info.stream.pos = 8;
             const messageType = info.stream.readByte();
-            info.compress = info.stream.readByte();
-            if(info.compress === 2)
+            const compress = info.stream.readByte();
+            if(compress === 2)
             {
                 throw new Ice.FeatureNotSupportedException("Cannot uncompress compressed message");
             }
@@ -1892,7 +1900,7 @@ class ConnectionI
         return info;
     }
 
-    invokeAll(stream, invokeNum, requestId, compress, servantManager, adapter)
+    invokeAll(stream, invokeNum, requestId, servantManager, adapter)
     {
         try
         {
@@ -1904,7 +1912,6 @@ class ConnectionI
                 let inc = new IncomingAsync(this._instance, this,
                                             adapter,
                                             !this._endpoint.datagram() && requestId !== 0, // response
-                                            compress,
                                             requestId);
 
                 //
@@ -2092,7 +2099,6 @@ class OutgoingMessage
     {
         this.stream = null;
         this.outAsync = null;
-        this.compress = false;
         this.requestId = 0;
         this.prepared = false;
     }
@@ -2130,11 +2136,10 @@ class OutgoingMessage
         }
     }
 
-    static createForStream(stream, compress, adopt)
+    static createForStream(stream, adopt)
     {
         const m = new OutgoingMessage();
         m.stream = stream;
-        m.compress = compress;
         m.adopt = adopt;
         m.isSent = false;
         m.requestId = 0;
@@ -2142,11 +2147,10 @@ class OutgoingMessage
         return m;
     }
 
-    static create(out, stream, compress, requestId)
+    static create(out, stream, requestId)
     {
         const m = new OutgoingMessage();
         m.stream = stream;
-        m.compress = compress;
         m.outAsync = out;
         m.requestId = requestId;
         m.isSent = false;

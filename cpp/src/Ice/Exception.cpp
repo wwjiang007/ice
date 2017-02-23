@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -632,14 +632,10 @@ Ice::CloseConnectionException::ice_print(ostream& out) const
 }
 
 void
-Ice::ForcedCloseConnectionException::ice_print(ostream& out) const
+Ice::ConnectionManuallyClosedException::ice_print(ostream& out) const
 {
     Exception::ice_print(out);
-    out << ":\nprotocol error: connection forcefully closed";
-    if(!reason.empty())
-    {
-        out << ":\n" << reason;
-    }
+    out << ":\nprotocol error: connection manually closed (" << (graceful ? "gracefully" : "forcefully") << ")";
 }
 
 void

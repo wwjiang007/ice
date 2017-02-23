@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -123,6 +123,9 @@ public class AllTests : TestCommon.AllTests
             catch(Ice.ConnectFailedException)
             {
             }
+            catch(Ice.ConnectTimeoutException)
+            {
+            }
         }
         WriteLine("ok");
 
@@ -156,7 +159,7 @@ public class AllTests : TestCommon.AllTests
                 test(test2.ice_getConnection() == test3.ice_getConnection());
 
                 names.Remove(test1.getAdapterName());
-                test1.ice_getConnection().close(false);
+                test1.ice_getConnection().close(Ice.ConnectionClose.GracefullyWithWait);
             }
 
             //
@@ -178,7 +181,7 @@ public class AllTests : TestCommon.AllTests
 
                 foreach(RemoteObjectAdapterPrx adpt in adapters)
                 {
-                    adpt.getTestIntf().ice_getConnection().close(false);
+                    adpt.getTestIntf().ice_getConnection().close(Ice.ConnectionClose.GracefullyWithWait);
                 }
             }
 
@@ -203,7 +206,7 @@ public class AllTests : TestCommon.AllTests
                 test(test2.ice_getConnection() == test3.ice_getConnection());
 
                 names.Remove(test1.getAdapterName());
-                test1.ice_getConnection().close(false);
+                test1.ice_getConnection().close(Ice.ConnectionClose.GracefullyWithWait);
             }
 
             //
@@ -233,7 +236,7 @@ public class AllTests : TestCommon.AllTests
             while(--count > 0)
             {
                 TestIntfPrx[] proxies;
-                if(count == 10)
+                if(count == 1)
                 {
                     com.deactivateObjectAdapter(adapters[4]);
                     --adapterCount;
@@ -287,7 +290,7 @@ public class AllTests : TestCommon.AllTests
                 {
                     try
                     {
-                        a.getTestIntf().ice_getConnection().close(false);
+                        a.getTestIntf().ice_getConnection().close(Ice.ConnectionClose.GracefullyWithWait);
                     }
                     catch(Ice.LocalException)
                     {
@@ -328,7 +331,7 @@ public class AllTests : TestCommon.AllTests
                 test(test2.ice_getConnection() == test3.ice_getConnection());
 
                 names.Remove(getAdapterNameWithAMI(test1));
-                test1.ice_getConnection().close(false);
+                test1.ice_getConnection().close(Ice.ConnectionClose.GracefullyWithWait);
             }
 
             //
@@ -350,7 +353,7 @@ public class AllTests : TestCommon.AllTests
 
                 foreach(RemoteObjectAdapterPrx adpt in adapters)
                 {
-                    adpt.getTestIntf().ice_getConnection().close(false);
+                    adpt.getTestIntf().ice_getConnection().close(Ice.ConnectionClose.GracefullyWithWait);
                 }
             }
 
@@ -375,7 +378,7 @@ public class AllTests : TestCommon.AllTests
                 test(test2.ice_getConnection() == test3.ice_getConnection());
 
                 names.Remove(getAdapterNameWithAMI(test1));
-                test1.ice_getConnection().close(false);
+                test1.ice_getConnection().close(Ice.ConnectionClose.GracefullyWithWait);
             }
 
             //
@@ -408,7 +411,7 @@ public class AllTests : TestCommon.AllTests
             while(names.Count > 0)
             {
                 names.Remove(obj.getAdapterName());
-                obj.ice_getConnection().close(false);
+                obj.ice_getConnection().close(Ice.ConnectionClose.GracefullyWithWait);
             }
 
             obj = TestIntfPrxHelper.uncheckedCast(obj.ice_endpointSelection(Ice.EndpointSelectionType.Random));
@@ -420,7 +423,7 @@ public class AllTests : TestCommon.AllTests
             while(names.Count > 0)
             {
                 names.Remove(obj.getAdapterName());
-                obj.ice_getConnection().close(false);
+                obj.ice_getConnection().close(Ice.ConnectionClose.GracefullyWithWait);
             }
 
             deactivate(com, adapters);
@@ -462,6 +465,9 @@ public class AllTests : TestCommon.AllTests
             catch(Ice.ConnectFailedException)
             {
             }
+            catch(Ice.ConnectTimeoutException)
+            {
+            }
 
             Ice.Endpoint[] endpoints = obj.ice_getEndpoints();
 
@@ -474,11 +480,11 @@ public class AllTests : TestCommon.AllTests
             adapters.Add(com.createObjectAdapter("Adapter36", endpoints[2].ToString()));
             for(i = 0; i < nRetry && obj.getAdapterName().Equals("Adapter36"); i++);
             test(i == nRetry);
-            obj.ice_getConnection().close(false);
+            obj.ice_getConnection().close(Ice.ConnectionClose.GracefullyWithWait);
             adapters.Add(com.createObjectAdapter("Adapter35", endpoints[1].ToString()));
             for(i = 0; i < nRetry && obj.getAdapterName().Equals("Adapter35"); i++);
             test(i == nRetry);
-            obj.ice_getConnection().close(false);
+            obj.ice_getConnection().close(Ice.ConnectionClose.GracefullyWithWait);
             adapters.Add(com.createObjectAdapter("Adapter34", endpoints[0].ToString()));
             for(i = 0; i < nRetry && obj.getAdapterName().Equals("Adapter34"); i++);
             test(i == nRetry);
@@ -510,6 +516,9 @@ public class AllTests : TestCommon.AllTests
                 test(false);
             }
             catch(Ice.ConnectFailedException)
+            {
+            }
+            catch(Ice.ConnectTimeoutException)
             {
             }
         }
@@ -628,6 +637,9 @@ public class AllTests : TestCommon.AllTests
             catch(Ice.ConnectFailedException)
             {
             }
+            catch(Ice.ConnectTimeoutException)
+            {
+            }
 
             Ice.Endpoint[] endpoints = obj.ice_getEndpoints();
 
@@ -688,6 +700,9 @@ public class AllTests : TestCommon.AllTests
             catch(Ice.ConnectFailedException)
             {
             }
+            catch(Ice.ConnectTimeoutException)
+            {
+            }
 
             Ice.Endpoint[] endpoints = obj.ice_getEndpoints();
 
@@ -746,7 +761,7 @@ public class AllTests : TestCommon.AllTests
                 for(i = 0; i < 5; i++)
                 {
                     test(obj.getAdapterName().Equals("Adapter82"));
-                    obj.ice_getConnection().close(false);
+                    obj.ice_getConnection().close(Ice.ConnectionClose.GracefullyWithWait);
                 }
 
                 TestIntfPrx testSecure = TestIntfPrxHelper.uncheckedCast(obj.ice_secure(true));
@@ -762,7 +777,7 @@ public class AllTests : TestCommon.AllTests
                 for(i = 0; i < 5; i++)
                 {
                     test(obj.getAdapterName().Equals("Adapter81"));
-                    obj.ice_getConnection().close(false);
+                    obj.ice_getConnection().close(Ice.ConnectionClose.GracefullyWithWait);
                 }
 
                 com.createObjectAdapter("Adapter83", (obj.ice_getEndpoints()[1]).ToString()); // Reactive tcp OA.
@@ -770,7 +785,7 @@ public class AllTests : TestCommon.AllTests
                 for(i = 0; i < 5; i++)
                 {
                     test(obj.getAdapterName().Equals("Adapter83"));
-                    obj.ice_getConnection().close(false);
+                    obj.ice_getConnection().close(Ice.ConnectionClose.GracefullyWithWait);
                 }
 
                 com.deactivateObjectAdapter((RemoteObjectAdapterPrx)adapters[0]);
@@ -780,6 +795,9 @@ public class AllTests : TestCommon.AllTests
                     test(false);
                 }
                 catch(Ice.ConnectFailedException)
+                {
+                }
+                catch(Ice.ConnectTimeoutException)
                 {
                 }
 

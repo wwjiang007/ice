@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -129,6 +129,7 @@ Unit* unit;
 Slice::DefinitionContext::DefinitionContext(int includeLevel, const StringList& metaData) :
     _includeLevel(includeLevel), _metaData(metaData), _seenDefinition(false)
 {
+    initSuppressedWarnings();
 }
 
 string
@@ -171,6 +172,7 @@ void
 Slice::DefinitionContext::setMetaData(const StringList& metaData)
 {
     _metaData = metaData;
+    initSuppressedWarnings();
 }
 
 string
@@ -191,6 +193,74 @@ StringList
 Slice::DefinitionContext::getMetaData() const
 {
     return _metaData;
+}
+
+void
+Slice::DefinitionContext::warning(WarningCategory category, const string& file, int line, const string& msg) const
+{
+    if(!suppressWarning(category))
+    {
+        emitWarning(file, line, msg);
+    }
+}
+
+void
+Slice::DefinitionContext::warning(WarningCategory category, const string& file, const string& line, const string& msg) const
+{
+    if(!suppressWarning(category))
+    {
+        emitWarning(file, line, msg);
+    }
+}
+
+bool
+Slice::DefinitionContext::suppressWarning(WarningCategory category) const
+{
+    return _suppressedWarnings.find(category) != _suppressedWarnings.end() ||
+        _suppressedWarnings.find(All) != _suppressedWarnings.end();
+}
+
+void
+Slice::DefinitionContext::initSuppressedWarnings()
+{
+    _suppressedWarnings.clear();
+    const string prefix = "suppress-warning";
+    string value = findMetaData(prefix);
+    if(value == prefix)
+    {
+        _suppressedWarnings.insert(All);
+    }
+    else if(!value.empty())
+    {
+        assert(value.length() > prefix.length());
+        if(value[prefix.length()] == ':')
+        {
+            value = value.substr(prefix.length() + 1);
+            vector<string> result;
+            IceUtilInternal::splitString(value, ",", result);
+            for(vector<string>::iterator p = result.begin(); p != result.end(); ++p)
+            {
+                string s = IceUtilInternal::trim(*p);
+                if(s == "all")
+                {
+                    _suppressedWarnings.insert(All);
+                }
+                else if(s == "deprecated")
+                {
+                    _suppressedWarnings.insert(Deprecated);
+                }
+                else if(s == "invalid-metadata")
+                {
+                    _suppressedWarnings.insert(InvalidMetaData);
+                }
+                else
+                {
+                    warning(InvalidMetaData, "", "", string("invalid category `") + s +
+                            "' in global metadata suppress-warning");
+                }
+            }
+        }
+    }
 }
 
 // ----------------------------------------------------------------------
@@ -1027,7 +1097,7 @@ Slice::Container::createDictionary(const string& name, const TypePtr& keyType, c
         }
         if(containsSequence)
         {
-            _unit->warning("use of sequences in dictionary keys has been deprecated");
+            _unit->warning(Deprecated, "use of sequences in dictionary keys has been deprecated");
         }
     }
 
@@ -1097,13 +1167,8 @@ Slice::Container::createEnum(const string& name, bool local, NodeType nt)
 EnumeratorPtr
 Slice::Container::createEnumerator(const string& name)
 {
-    EnumeratorPtr p = validateEnumerator(name);
-    if(p)
-    {
-        return p;
-    }
-
-    p = new Enumerator(this, name);
+    validateEnumerator(name);
+    EnumeratorPtr p = new Enumerator(this, name);
     _contents.push_back(p);
     return p;
 }
@@ -1111,13 +1176,8 @@ Slice::Container::createEnumerator(const string& name)
 EnumeratorPtr
 Slice::Container::createEnumerator(const string& name, int value)
 {
-    EnumeratorPtr p = validateEnumerator(name);
-    if(p)
-    {
-        return p;
-    }
-
-    p = new Enumerator(this, name, value);
+    validateEnumerator(name);
+    EnumeratorPtr p = new Enumerator(this, name, value);
     _contents.push_back(p);
     return p;
 }
@@ -1163,15 +1223,17 @@ Slice::Container::createConst(const string name, const TypePtr& constType, const
         checkForGlobalDef(name, "constant"); // Don't return here -- we create the constant anyway.
     }
 
+    SyntaxTreeBasePtr resolvedValueType = valueType;
+
     //
-    // Validate the constant and its value.
+    // Validate the constant and its value; for enums, find enumerator
     //
-    if(nt == Real && !validateConstant(name, constType, valueType, value, true))
+    if(nt == Real && !validateConstant(name, constType, resolvedValueType, value, true))
     {
         return 0;
     }
 
-    ConstPtr p = new Const(this, name, constType, metaData, valueType, value, literal);
+    ConstPtr p = new Const(this, name, constType, metaData, resolvedValueType, value, literal);
     _contents.push_back(p);
     return p;
 }
@@ -1553,6 +1615,86 @@ Slice::Container::enums() const
             result.push_back(q);
         }
     }
+    return result;
+}
+
+EnumeratorList
+Slice::Container::enumerators() const
+{
+    EnumeratorList result;
+    for(ContainedList::const_iterator p = _contents.begin(); p != _contents.end(); ++p)
+    {
+        EnumeratorPtr q = EnumeratorPtr::dynamicCast(*p);
+        if(q)
+        {
+            result.push_back(q);
+        }
+    }
+    return result;
+}
+
+//
+// Find enumerators using the old unscoped enumerators lookup
+//
+EnumeratorList
+Slice::Container::enumerators(const string& scoped) const
+{
+    EnumeratorList result;
+    string::size_type lastColon = scoped.rfind(':');
+
+    if(lastColon == string::npos)
+    {
+        // check all enclosing scopes
+        ContainerPtr container = const_cast<Container*>(this);
+        do
+        {
+            EnumList enums = container->enums();
+            for(EnumList::iterator p = enums.begin(); p != enums.end(); ++p)
+            {
+                ContainedList cl = (*p)->lookupContained(scoped, false);
+                if(!cl.empty())
+                {
+                    result.push_back(EnumeratorPtr::dynamicCast(cl.front()));
+                }
+            }
+
+            ContainedPtr contained = ContainedPtr::dynamicCast(container);
+            if(contained)
+            {
+                container = contained->container();
+            }
+            else
+            {
+                container = 0;
+            }
+        }
+        while(result.empty() && container);
+    }
+    else
+    {
+        // Find the referenced scope
+        ContainerPtr container = const_cast<Container*>(this);
+        string scope = scoped.substr(0, scoped.rfind("::"));
+        ContainedList cl = container->lookupContained(scope, false);
+        if(!cl.empty())
+        {
+            container = ContainerPtr::dynamicCast(cl.front());
+            if(container)
+            {
+                EnumList enums = container->enums();
+                string name = scoped.substr(lastColon + 1);
+                for(EnumList::iterator p = enums.begin(); p != enums.end(); ++p)
+                {
+                    ContainedList cl = (*p)->lookupContained(name, false);
+                    if(!cl.empty())
+                    {
+                        result.push_back(EnumeratorPtr::dynamicCast(cl.front()));
+                    }
+                }
+            }
+        }
+    }
+
     return result;
 }
 
@@ -2118,7 +2260,7 @@ Slice::Container::mergeModules()
             metaData2.unique();
             if(!checkGlobalMetaData(metaData1, metaData2))
             {
-                unit()->warning("global metadata mismatch for module `" + mod1->name() + "' in files " +
+                unit()->warning(All, "global metadata mismatch for module `" + mod1->name() + "' in files " +
                                 dc1->filename() + " and " + dc2->filename());
             }
 
@@ -2557,7 +2699,7 @@ Slice::Container::checkGlobalMetaData(const StringList& m1, const StringList& m2
 }
 
 bool
-Slice::Container::validateConstant(const string& name, const TypePtr& type, const SyntaxTreeBasePtr& valueType,
+Slice::Container::validateConstant(const string& name, const TypePtr& type, SyntaxTreeBasePtr& valueType,
                                    const string& value, bool isConstant)
 {
     //
@@ -2786,20 +2928,57 @@ Slice::Container::validateConstant(const string& name, const TypePtr& type, cons
         }
         else
         {
-            EnumeratorPtr lte = EnumeratorPtr::dynamicCast(valueType);
+            if(valueType)
+            {
+                EnumeratorPtr lte = EnumeratorPtr::dynamicCast(valueType);
 
-            if(!lte)
-            {
-                string msg = "type of initializer is incompatible with the type of " + desc + " `" + name + "'";
-                _unit->error(msg);
-                return false;
+                if(!lte)
+                {
+                    string msg = "type of initializer is incompatible with the type of " + desc + " `" + name + "'";
+                    _unit->error(msg);
+                    return false;
+                }
+                EnumeratorList elist = e->enumerators();
+                if(find(elist.begin(), elist.end(), lte) == elist.end())
+                {
+                    string msg = "enumerator `" + value + "' is not defined in enumeration `" + e->scoped() + "'";
+                    _unit->error(msg);
+                    return false;
+                }
             }
-            EnumeratorList elist = e->getEnumerators();
-            if(find(elist.begin(), elist.end(), lte) == elist.end())
+            else
             {
-                string msg = "enumerator `" + value + "' is not defined in enumeration `" + e->scoped() + "'";
-                _unit->error(msg);
-                return false;
+                // Check if value designates an enumerator of e
+                string newVal = value;
+                string::size_type lastColon = value.rfind(':');
+                if(lastColon != string::npos && lastColon + 1 < value.length())
+                {
+                    newVal = value.substr(0, lastColon + 1) + e->name() + "::" + value.substr(lastColon + 1);
+                }
+
+                ContainedList clist = e->lookupContained(newVal, false);
+                if(clist.empty())
+                {
+                    string msg = "`" + value + "' does not designate an enumerator of `" + e->scoped() + "'";
+                    _unit->error(msg);
+                    return false;
+                }
+                EnumeratorPtr lte = EnumeratorPtr::dynamicCast(clist.front());
+                if(lte)
+                {
+                    valueType = lte;
+                    if(lastColon != string::npos)
+                    {
+                        _unit->warning(Deprecated, string("referencing enumerator `") + lte->name() +
+                                       "' in its enumeration's enclosing scope is deprecated");
+                    }
+                }
+                else
+                {
+                    string msg = "type of initializer is incompatible with the type of " + desc + " `" + name + "'";
+                    _unit->error(msg);
+                    return false;
+                }
             }
         }
     }
@@ -2807,7 +2986,7 @@ Slice::Container::validateConstant(const string& name, const TypePtr& type, cons
     return true;
 }
 
-EnumeratorPtr
+void
 Slice::Container::validateEnumerator(const string& name)
 {
     checkIdentifier(name);
@@ -2815,32 +2994,19 @@ Slice::Container::validateEnumerator(const string& name)
     ContainedList matches = _unit->findContents(thisScope() + name);
     if(!matches.empty())
     {
-        EnumeratorPtr p = EnumeratorPtr::dynamicCast(matches.front());
-        if(p)
-        {
-            if(_unit->ignRedefs())
-            {
-                p->updateIncludeLevel();
-                return p;
-            }
-        }
         if(matches.front()->name() == name)
         {
-            string msg = "redefinition of " + matches.front()->kindOf() + " `" + matches.front()->name();
-            msg += "' as enumerator";
-            _unit->error(msg);
+            _unit->error(string("redefinition of enumerator `") + name + "'");
         }
         else
         {
             string msg = "enumerator `" + name + "' differs only in capitalization from ";
-            msg += matches.front()->kindOf() + " `" + matches.front()->name() + "'";
+            msg += "`" + matches.front()->name() + "'";
             _unit->error(msg);
         }
     }
 
     nameIsLegal(name, "enumerator"); // Don't return here -- we create the enumerator anyway.
-
-    return 0;
 }
 
 // ----------------------------------------------------------------------
@@ -3315,6 +3481,12 @@ Slice::ClassDef::createOperation(const string& name,
         _unit->error(msg);
     }
 
+    if(!isInterface() && !isLocal() && !_hasOperations)
+    {
+        // Only warn for the first operation
+        _unit->warning(Deprecated, "classes with operations are deprecated");
+    }
+
     _hasOperations = true;
     OperationPtr op = new Operation(this, name, returnType, optional, tag, mode);
     _contents.push_back(op);
@@ -3410,7 +3582,7 @@ Slice::ClassDef::createDataMember(const string& name, const TypePtr& type, bool 
     string dv = defaultValue;
     string dl = defaultLiteral;
 
-    if(dlt)
+    if(dlt || (EnumPtr::dynamicCast(type) && !dv.empty()))
     {
         //
         // Validate the default value.
@@ -3782,6 +3954,17 @@ Slice::ClassDef::ClassDef(const ContainerPtr& container, const string& name, int
     _local(local),
     _compactId(id)
 {
+    if(!local && !intf)
+    {
+        for(ClassList::const_iterator p = _bases.begin(); p != _bases.end(); ++p)
+        {  
+            if((*p)->isInterface())
+            {
+                _unit->warning(Deprecated, "classes implementing interfaces are deprecated");
+                break;
+            }
+        }
+    }
     //
     // First element of bases may be a class, all others must be
     // interfaces.
@@ -3933,7 +4116,7 @@ Slice::Exception::createDataMember(const string& name, const TypePtr& type, bool
     string dv = defaultValue;
     string dl = defaultLiteral;
 
-    if(dlt)
+    if(dlt || (EnumPtr::dynamicCast(type) && !dv.empty()))
     {
         //
         // Validate the default value.
@@ -4255,7 +4438,7 @@ Slice::Struct::createDataMember(const string& name, const TypePtr& type, bool op
     string dv = defaultValue;
     string dl = defaultLiteral;
 
-    if(dlt)
+    if(dlt || (EnumPtr::dynamicCast(type) && !dv.empty()))
     {
         //
         // Validate the default value.
@@ -4721,69 +4904,7 @@ Slice::Dictionary::Dictionary(const ContainerPtr& container, const string& name,
 void
 Slice::Enum::destroy()
 {
-    _enumerators.clear();
     SyntaxTreeBase::destroy();
-}
-
-EnumeratorList
-Slice::Enum::getEnumerators()
-{
-    return _enumerators;
-}
-
-void
-Slice::Enum::setEnumerators(const EnumeratorList& ens)
-{
-    _enumerators = ens;
-    int lastValue = -1;
-    set<int> values;
-    for(EnumeratorList::iterator p = _enumerators.begin(); p != _enumerators.end(); ++p)
-    {
-        (*p)->_type = this;
-
-        if((*p)->_explicitValue)
-        {
-            _explicitValue = true;
-
-            if((*p)->_value < 0)
-            {
-                string msg = "value for enumerator `" + (*p)->name() + "' is out of range";
-                _unit->error(msg);
-            }
-        }
-        else
-        {
-            if(lastValue == Int32Max)
-            {
-                string msg = "value for enumerator `" + (*p)->name() + "' is out of range";
-                _unit->error(msg);
-            }
-
-            //
-            // If the enumerator was not assigned an explicit value, we automatically assign
-            // it one more than the previous enumerator.
-            //
-            (*p)->_value = lastValue + 1;
-        }
-
-        if(values.count((*p)->_value) != 0)
-        {
-            string msg = "enumerator `" + (*p)->name() + "' has a duplicate value";
-            _unit->error(msg);
-        }
-        values.insert((*p)->_value);
-
-        lastValue = (*p)->_value;
-
-        if(lastValue > _maxValue)
-        {
-            _maxValue = lastValue;
-        }
-        if(lastValue < _minValue)
-        {
-            _minValue = lastValue;
-        }
-    }
 }
 
 bool
@@ -4854,13 +4975,75 @@ Slice::Enum::recDependencies(set<ConstructedPtr>&)
 
 Slice::Enum::Enum(const ContainerPtr& container, const string& name, bool local) :
     SyntaxTreeBase(container->unit()),
+    Container(container->unit()),
     Type(container->unit()),
     Contained(container, name),
     Constructed(container, name, local),
     _explicitValue(false),
     _minValue(Int32Max),
-    _maxValue(0)
+    _maxValue(0),
+    _lastValue(-1)
 {
+}
+
+int
+Slice::Enum::newEnumerator(const EnumeratorPtr& p)
+{
+    if(p->explicitValue())
+    {
+        _explicitValue = true;
+        _lastValue = p->value();
+
+        if(_lastValue < 0)
+        {
+            string msg = "value for enumerator `" + p->name() + "' is out of range";
+            _unit->error(msg);
+        }
+    }
+    else
+    {
+        if(_lastValue == Int32Max)
+        {
+            string msg = "value for enumerator `" + p->name() + "' is out of range";
+            _unit->error(msg);
+        }
+        else
+        {
+            //
+            // If the enumerator was not assigned an explicit value, we automatically assign
+            // it one more than the previous enumerator.
+            //
+            ++_lastValue;
+        }
+    }
+
+    bool checkForDuplicates = true;
+    if(_lastValue > _maxValue)
+    {
+        _maxValue = _lastValue;
+        checkForDuplicates = false;
+    }
+    if(_lastValue < _minValue)
+    {
+        _minValue = _lastValue;
+        checkForDuplicates = false;
+    }
+
+    if(checkForDuplicates)
+    {
+        EnumeratorList enl = enumerators();
+        for(EnumeratorList::iterator q = enl.begin(); q != enl.end(); ++q)
+        {
+            EnumeratorPtr& r = *q;
+            if(r != p && r->value() == _lastValue)
+            {
+                _unit->error(string("enumerator `") + p->name() + "' has the same value as enumerator `" +
+                             r->name() + "'");
+            }
+        }
+    }
+
+    return _lastValue;
 }
 
 // ----------------------------------------------------------------------
@@ -4870,7 +5053,7 @@ Slice::Enum::Enum(const ContainerPtr& container, const string& name, bool local)
 EnumPtr
 Slice::Enumerator::type() const
 {
-    return _type;
+    return EnumPtr::dynamicCast(container());
 }
 
 Contained::ContainedType
@@ -4909,6 +5092,7 @@ Slice::Enumerator::Enumerator(const ContainerPtr& container, const string& name)
     _explicitValue(false),
     _value(-1)
 {
+    _value = EnumPtr::dynamicCast(container)->newEnumerator(this);
 }
 
 Slice::Enumerator::Enumerator(const ContainerPtr& container, const string& name, int value) :
@@ -4917,6 +5101,7 @@ Slice::Enumerator::Enumerator(const ContainerPtr& container, const string& name,
     _explicitValue(true),
     _value(value)
 {
+    EnumPtr::dynamicCast(container)->newEnumerator(this);
 }
 
 // ----------------------------------------------------------------------
@@ -4989,6 +5174,11 @@ Slice::Const::Const(const ContainerPtr& container, const string& name, const Typ
     _value(value),
     _literal(literal)
 {
+    if(valueType == 0)
+    {
+        cerr << "const " << name << " created with null valueType" << endl;
+    }
+
 }
 
 // ----------------------------------------------------------------------
@@ -5435,7 +5625,7 @@ Slice::Operation::attributes() const
         }
         if(i == 2)
         {
-            emitWarning(definitionContext()->filename(), line(), "invalid freeze metadata for operation");
+            _unit->warning(InvalidMetaData, "invalid freeze metadata for operation");
         }
         else
         {
@@ -5456,7 +5646,7 @@ Slice::Operation::attributes() const
                 {
                     if(result != 0 && (i == int(Supports) || i == int(Never)))
                     {
-                        emitWarning(definitionContext()->filename(), line(), "invalid freeze metadata for operation");
+                        _unit->warning(InvalidMetaData, "invalid freeze metadata for operation");
                     }
                     else
                     {
@@ -5470,7 +5660,7 @@ Slice::Operation::attributes() const
 
             if(i == 4)
             {
-                emitWarning(definitionContext()->filename(), line(), "invalid freeze metadata for operation");
+                _unit->warning(InvalidMetaData, "invalid freeze metadata for operation");
 
                 //
                 // Set default
@@ -5953,13 +6143,6 @@ Slice::Unit::setSeenDefinition()
 }
 
 void
-Slice::Unit::error(const char* s)
-{
-    emitError(currentFile(), _currentLine, s);
-    _errors++;
-}
-
-void
 Slice::Unit::error(const string& s)
 {
     emitError(currentFile(), _currentLine, s);
@@ -5967,15 +6150,16 @@ Slice::Unit::error(const string& s)
 }
 
 void
-Slice::Unit::warning(const char* s) const
+Slice::Unit::warning(WarningCategory category, const string& msg) const
 {
-    emitWarning(currentFile(), _currentLine, s);
-}
-
-void
-Slice::Unit::warning(const string& s) const
-{
-    emitWarning(currentFile(), _currentLine, s);
+    if(_definitionContextStack.empty())
+    {
+        emitWarning(currentFile(), _currentLine, msg);
+    }
+    else
+    {
+        _definitionContextStack.top()->warning(category, currentFile(), _currentLine, msg);
+    }
 }
 
 ContainerPtr

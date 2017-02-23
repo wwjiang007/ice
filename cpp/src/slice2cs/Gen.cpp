@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -337,13 +337,13 @@ Slice::CsVisitor::writeMarshalDataMember(const DataMemberPtr& member, const stri
     else
     {
         string stream = forStruct ? "" : "ostr_";
-        string memberName = fixId(member->name());
+        string memberName = name;
         if(forStruct)
         {
             memberName = "this." + memberName;
         }
 
-        writeMarshalUnmarshalCode(_out, member->type(), name, true, stream);
+        writeMarshalUnmarshalCode(_out, member->type(), memberName, true, stream);
     }
 }
 
@@ -376,13 +376,13 @@ Slice::CsVisitor::writeUnmarshalDataMember(const DataMemberPtr& member, const st
     else
     {
         string stream = forStruct ? "" : "istr_";
-        string memberName = fixId(member->name());
+        string memberName = name;
         if(forStruct)
         {
             memberName = "this." + memberName;
         }
 
-        writeMarshalUnmarshalCode(_out, member->type(), classType ? patcher : name, false, stream);
+        writeMarshalUnmarshalCode(_out, member->type(), classType ? patcher : memberName, false, stream);
     }
 }
 
@@ -1282,13 +1282,13 @@ Slice::CsVisitor::writeValue(const TypePtr& type)
     EnumPtr en = EnumPtr::dynamicCast(type);
     if(en)
     {
-        return fixId(en->scoped()) + "." + fixId((*en->getEnumerators().begin())->name());
+        return fixId(en->scoped()) + "." + fixId((*en->enumerators().begin())->name());
     }
 
     StructPtr st = StructPtr::dynamicCast(type);
     if(st)
     {
-        return st->hasMetaData("clr:class") ? string("null") : "new " + fixId(st->scoped()) + "()";
+        return st->hasMetaData("cs:class") ? string("null") : "new " + fixId(st->scoped()) + "()";
     }
 
     return "null";
@@ -1305,7 +1305,6 @@ Slice::CsVisitor::writeConstantValue(const TypePtr& type, const SyntaxTreeBasePt
     else
     {
         BuiltinPtr bp = BuiltinPtr::dynamicCast(type);
-        EnumPtr ep;
         if(bp && bp->kind() == Builtin::KindString)
         {
             _out << "\"" << toStringLiteral(value, "\a\b\f\n\r\t\v\0", "", UCN, 0) << "\"";
@@ -1318,20 +1317,11 @@ Slice::CsVisitor::writeConstantValue(const TypePtr& type, const SyntaxTreeBasePt
         {
             _out << value << "F";
         }
-        else if((ep = EnumPtr::dynamicCast(type)))
+        else if(EnumPtr::dynamicCast(type))
         {
-            string enumName = fixId(ep->scoped());
-            string::size_type colon = value.rfind(':');
-            string enumerator;
-            if(colon != string::npos)
-            {
-                enumerator = fixId(value.substr(colon + 1));
-            }
-            else
-            {
-                enumerator = fixId(value);
-            }
-            _out << enumName << '.' << enumerator;
+            EnumeratorPtr lte = EnumeratorPtr::dynamicCast(valueType);
+            assert(lte);
+            _out << fixId(lte->scoped());
         }
         else
         {
@@ -1391,13 +1381,13 @@ Slice::CsVisitor::writeDataMemberInitializers(const DataMemberList& members, int
             BuiltinPtr builtin = BuiltinPtr::dynamicCast((*p)->type());
             if(builtin && builtin->kind() == Builtin::KindString)
             {
-                _out << nl << fixId((*p)->name(), baseTypes) << " = \"\";";
+                _out << nl << "this." << fixId((*p)->name(), baseTypes) << " = \"\";";
             }
 
             StructPtr st = StructPtr::dynamicCast((*p)->type());
             if(st)
             {
-                _out << nl << fixId((*p)->name(), baseTypes) << " = new " << typeToString(st, false) << "();";
+                _out << nl << "this." << fixId((*p)->name(), baseTypes) << " = new " << typeToString(st, false) << "();";
             }
         }
     }
@@ -2198,7 +2188,7 @@ Slice::Gen::printHeader()
     static const char* header =
 "// **********************************************************************\n"
 "//\n"
-"// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.\n"
+"// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.\n"
 "//\n"
 "// This copy of Ice is licensed to you under the terms described in the\n"
 "// ICE_LICENSE file included in this distribution.\n"
@@ -2393,10 +2383,10 @@ Slice::Gen::TypesVisitor::visitClassDefStart(const ClassDefPtr& p)
     }
 
     //
-    // Check for clr:implements metadata.
+    // Check for cs:implements metadata.
     //
     const StringList metaData = p->getMetaData();
-    static const string prefix = "clr:implements:";
+    static const string prefix = "cs:implements:";
     for(StringList::const_iterator q = metaData.begin(); q != metaData.end(); ++q)
     {
         if(q->find(prefix) == 0)
@@ -2467,7 +2457,7 @@ Slice::Gen::TypesVisitor::visitClassDefEnd(const ClassDefPtr& p)
         if(!allDataMembers.empty())
         {
             const bool isAbstract = p->isLocal() && p->isAbstract();
-            const bool propertyMapping = p->hasMetaData("clr:property");
+            const bool propertyMapping = p->hasMetaData("cs:property");
 
             _out << sp << nl << "#region Constructors";
 
@@ -2479,7 +2469,7 @@ Slice::Gen::TypesVisitor::visitClassDefEnd(const ClassDefPtr& p)
                 _out << " : base()";
             }
             _out << sb;
-            writeDataMemberInitializers(dataMembers, 0, propertyMapping);
+            writeDataMemberInitializers(dataMembers, DotNet::ICloneable, propertyMapping);
             _out << eb;
 
             _out << sp;
@@ -2488,7 +2478,7 @@ Slice::Gen::TypesVisitor::visitClassDefEnd(const ClassDefPtr& p)
             vector<string> paramDecl;
             for(DataMemberList::const_iterator d = allDataMembers.begin(); d != allDataMembers.end(); ++d)
             {
-                string memberName = fixId((*d)->name());
+                string memberName = fixId((*d)->name(), DotNet::ICloneable);
                 string memberType = typeToString((*d)->type(), (*d)->optional());
                 paramDecl.push_back(memberType + " " + memberName);
             }
@@ -2500,7 +2490,7 @@ Slice::Gen::TypesVisitor::visitClassDefEnd(const ClassDefPtr& p)
                 DataMemberList baseDataMembers = bases.front()->allDataMembers();
                 for(DataMemberList::const_iterator d = baseDataMembers.begin(); d != baseDataMembers.end(); ++d)
                 {
-                    baseParamNames.push_back(fixId((*d)->name()));
+                    baseParamNames.push_back(fixId((*d)->name(), DotNet::ICloneable));
                 }
                 _out << baseParamNames << epar;
             }
@@ -2508,7 +2498,7 @@ Slice::Gen::TypesVisitor::visitClassDefEnd(const ClassDefPtr& p)
             for(DataMemberList::const_iterator d = dataMembers.begin(); d != dataMembers.end(); ++d)
             {
                 _out << nl << "this.";
-                const string paramName = fixId((*d)->name());
+                const string paramName = fixId((*d)->name(), DotNet::ICloneable);
                 if(propertyMapping)
                 {
                     _out << "_" + (*d)->name();
@@ -3178,10 +3168,10 @@ Slice::Gen::TypesVisitor::visitStructStart(const StructPtr& p)
     }
 
     //
-    // Check for clr:implements metadata.
+    // Check for cs:implements metadata.
     //
     const StringList metaData = p->getMetaData();
-    static const string prefix = "clr:implements:";
+    static const string prefix = "cs:implements:";
     for(StringList::const_iterator q = metaData.begin(); q != metaData.end(); ++q)
     {
         if(q->find(prefix) == 0)
@@ -3218,7 +3208,7 @@ Slice::Gen::TypesVisitor::visitStructEnd(const StructPtr& p)
     DataMemberList classMembers = p->classDataMembers();
     DataMemberList dataMembers = p->dataMembers();
 
-    const bool propertyMapping = p->hasMetaData("clr:property");
+    const bool propertyMapping = p->hasMetaData("cs:property");
 
     _out << sp << nl << "#endregion"; // Slice data members
 
@@ -3504,7 +3494,7 @@ Slice::Gen::TypesVisitor::visitEnum(const EnumPtr& p)
 {
     string name = fixId(p->name());
     string scoped = fixId(p->scoped());
-    EnumeratorList enumerators = p->getEnumerators();
+    EnumeratorList enumerators = p->enumerators();
     const bool explicitValue = p->explicitValue();
 
     _out << sp;
@@ -3591,7 +3581,7 @@ Slice::Gen::TypesVisitor::visitDataMember(const DataMemberPtr& p)
         {
             baseTypes = DotNet::ICloneable;
         }
-        if(cont->hasMetaData("clr:property"))
+        if(cont->hasMetaData("cs:property"))
         {
             isProperty = true;
         }
@@ -3607,7 +3597,7 @@ Slice::Gen::TypesVisitor::visitDataMember(const DataMemberPtr& p)
         isLocal = cl->isLocal();
         baseTypes = DotNet::ICloneable;
         isClass = true;
-        if(cont->hasMetaData("clr:property"))
+        if(cont->hasMetaData("cs:property"))
         {
             isProperty = true;
         }
@@ -3715,8 +3705,8 @@ Slice::Gen::TypesVisitor::writeMemberEquals(const DataMemberList& dataMembers, i
             if(seq)
             {
                 string meta;
-                bool isSerializable = seq->findMetaData("clr:serializable:", meta);
-                bool isGeneric = seq->findMetaData("clr:generic:", meta);
+                bool isSerializable = seq->findMetaData("cs:serializable:", meta);
+                bool isGeneric = seq->findMetaData("cs:generic:", meta);
                 bool isArray = !isSerializable && !isGeneric;
                 if(isArray)
                 {
@@ -3951,7 +3941,7 @@ Slice::Gen::ProxyVisitor::visitModuleEnd(const ModulePtr&)
 bool
 Slice::Gen::ProxyVisitor::visitClassDefStart(const ClassDefPtr& p)
 {
-    if(p->isLocal())
+    if(p->isLocal() || (!p->isInterface() && p->allOperations().size() == 0))
     {
         return false;
     }
@@ -3963,20 +3953,28 @@ Slice::Gen::ProxyVisitor::visitClassDefStart(const ClassDefPtr& p)
     writeDocComment(p, getDeprecateReason(p, 0, p->isInterface() ? "interface" : "class"));
     emitGeneratedCodeAttribute();
     _out << nl << "public interface " << name << "Prx : ";
-    if(bases.empty())
+
+    vector<string> baseInterfaces;
+    for(ClassList::const_iterator q = bases.begin(); q != bases.end(); ++q)
     {
-        _out << "Ice.ObjectPrx";
-    }
-    else
-    {
-        ClassList::const_iterator q = bases.begin();
-        while(q != bases.end())
+        ClassDefPtr def = *q;
+        if(def->isInterface() || def->allOperations().size() > 0)
         {
-            _out << fixId((*q)->scoped() + "Prx");
-            if(++q != bases.end())
-            {
-                _out << ", ";
-            }
+            baseInterfaces.push_back(fixId((*q)->scoped() + "Prx"));
+        }
+    }
+
+    if(baseInterfaces.empty())
+    {
+        baseInterfaces.push_back("Ice.ObjectPrx");
+    }
+    
+    for(vector<string>::const_iterator q = baseInterfaces.begin(); q != baseInterfaces.end();)
+    {
+        _out << *q;
+        if(++q != baseInterfaces.end())
+        {
+            _out << ", ";
         }
     }
     _out << sb;
@@ -4286,7 +4284,7 @@ Slice::Gen::HelperVisitor::visitModuleEnd(const ModulePtr&)
 bool
 Slice::Gen::HelperVisitor::visitClassDefStart(const ClassDefPtr& p)
 {
-    if(p->isLocal())
+    if(p->isLocal() || (!p->isInterface() && p->allOperations().size() == 0))
     {
         return false;
     }
@@ -5005,7 +5003,7 @@ Slice::Gen::HelperVisitor::visitSequence(const SequencePtr& p)
     _out << eb;
     _out << eb;
 
-    string prefix = "clr:generic:";
+    string prefix = "cs:generic:";
     string meta;
     if(p->findMetaData(prefix, meta))
     {
@@ -5054,7 +5052,7 @@ Slice::Gen::HelperVisitor::visitDictionary(const DictionaryPtr& p)
 
     string meta;
 
-    string prefix = "clr:generic:";
+    string prefix = "cs:generic:";
     string genericType;
     if(!p->findMetaData(prefix, meta))
     {
@@ -5540,7 +5538,7 @@ Slice::Gen::ImplVisitor::visitModuleEnd(const ModulePtr&)
 bool
 Slice::Gen::ImplVisitor::visitClassDefStart(const ClassDefPtr& p)
 {
-    if(!p->isAbstract())
+    if(p->allOperations().size() == 0)
     {
         return false;
     }

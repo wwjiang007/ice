@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -158,6 +158,24 @@ namespace IceInternal
             return null;
         }
 
+        public override void initWithOptions(List<string> args, bool oaEndpoint)
+        {
+            base.initWithOptions(args, oaEndpoint);
+
+            if(_mcastInterface.Equals("*"))
+            {
+                if(oaEndpoint)
+                {
+                    _mcastInterface = "";
+                }
+                else
+                {
+                    throw new Ice.EndpointParseException("`--interface *' not valid for proxy endpoint `" +
+                                                         ToString() + "'");
+                }
+            }
+        }
+
         public UdpEndpointI endpoint(UdpTransceiver transceiver)
         {
             return new UdpEndpointI(instance_, host_, transceiver.effectivePort(), sourceAddr_, _mcastInterface,
@@ -269,10 +287,10 @@ namespace IceInternal
         public override void hashInit(ref int h)
         {
             base.hashInit(ref h);
-            IceInternal.HashUtil.hashAdd(ref h, _mcastInterface);
-            IceInternal.HashUtil.hashAdd(ref h, _mcastTtl);
-            IceInternal.HashUtil.hashAdd(ref h, _connect);
-            IceInternal.HashUtil.hashAdd(ref h, _compress);
+            HashUtil.hashAdd(ref h, _mcastInterface);
+            HashUtil.hashAdd(ref h, _mcastTtl);
+            HashUtil.hashAdd(ref h, _connect);
+            HashUtil.hashAdd(ref h, _compress);
         }
 
         public override void fillEndpointInfo(Ice.IPEndpointInfo info)
@@ -352,9 +370,9 @@ namespace IceInternal
 
                 try
                 {
-                    _mcastTtl = System.Int32.Parse(argument, CultureInfo.InvariantCulture);
+                    _mcastTtl = int.Parse(argument, CultureInfo.InvariantCulture);
                 }
-                catch(System.FormatException ex)
+                catch(FormatException ex)
                 {
                     Ice.EndpointParseException e = new Ice.EndpointParseException(ex);
                     e.str = "invalid TTL value `" + argument + "' in endpoint " + endpoint;

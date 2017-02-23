@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -731,6 +731,10 @@ setExceptionMembers(const Ice::LocalException& ex, VALUE p)
     {
         volatile VALUE v = createString(e.reason);
         callRuby(rb_iv_set, p, "@reason", v);
+    }
+    catch(const Ice::ConnectionManuallyClosedException& e)
+    {
+        callRuby(rb_iv_set, p, "@graceful", e.graceful ? Qtrue : Qfalse);
     }
     catch(const Ice::LocalException&)
     {

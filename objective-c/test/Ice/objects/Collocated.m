@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -10,6 +10,11 @@
 #import <objc/Ice.h>
 #import <TestCommon.h>
 #import <objects/TestI.h>
+
+#if defined(__clang__)
+// For 'Ice::Communicator::addObjectFactory()' deprecation
+#   pragma clang diagnostic ignored "-Wdeprecated-declarations"
+#endif
 
 // Note that the factory must not autorelease the
 // returned objects.
@@ -91,6 +96,9 @@ run(id<ICECommunicator> communicator)
     TestObjectsInitialI* initial = [TestObjectsInitialI initial];
     [adapter add:initial identity:[ICEUtil stringToIdentity:@"initial"]];
 
+    ICEObject* testObj = ICE_AUTORELEASE([[TestObjectsTestIntfI alloc] init]);
+    [adapter add:testObj identity:[ICEUtil stringToIdentity:@"test"]];
+
     ICEObject* uoet = ICE_AUTORELEASE([[UnexpectedObjectExceptionTestI alloc] init]);
     [adapter add:uoet identity:[ICEUtil stringToIdentity:@"uoet"]];
 
@@ -141,15 +149,7 @@ main(int argc, char* argv[])
 
         if(communicator)
         {
-            @try
-            {
-                [communicator destroy];
-            }
-            @catch(ICEException* ex)
-            {
-                tprintf("%@\n", ex);
-                status = EXIT_FAILURE;
-            }
+            [communicator destroy];
         }
     }
     return status;

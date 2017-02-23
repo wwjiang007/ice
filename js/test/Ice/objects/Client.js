@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -129,7 +129,7 @@
         return null;
     }
 
-    class MyObjectFactory extends Ice.ObjectFactory
+    class MyObjectFactory
     {
 
         create(type)

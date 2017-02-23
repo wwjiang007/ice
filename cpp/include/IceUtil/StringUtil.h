@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -77,7 +77,7 @@ ICE_API bool match(const std::string&, const std::string&, bool = false);
 //
 ICE_API std::string lastErrorToString();
 #ifdef _WIN32
-ICE_API std::string errorToString(int, LPCVOID = NULL);
+ICE_API std::string errorToString(int, LPCVOID = ICE_NULLPTR);
 #else
 ICE_API std::string errorToString(int);
 #endif

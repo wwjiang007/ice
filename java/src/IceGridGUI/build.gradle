@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -97,7 +97,7 @@ assemble.dependsOn(signjar)
 
 if(macosx)
 {
-    def appName = "IceGrid Admin"
+    def appName = "IceGrid GUI"
     task bundleapp(dependsOn: updateManifest) << {
         ant.taskdef(name: 'bundleapp',
                     classname: 'com.oracle.appbundler.AppBundlerTask',
@@ -120,7 +120,7 @@ if(macosx)
             }
             option(value: "-Dcom.apple.macos.useScreenMenuBar=true") {
             }
-            option(value: "-Xdock:name=IceGrid Admin") {
+            option(value: "-Xdock:name=IceGrid GUI") {
             }
             option(value: "-Dcom.apple.mrj.application.apple.menu.about.name=${appName}") {
             }
@@ -136,7 +136,7 @@ if(macosx)
 
 clean {
     delete("${libDir}/${jarName}")
-    delete("${libDir}/IceGrid Admin.app")
+    delete("${libDir}/IceGrid GUI.app")
 }
 
 if(macosx) {

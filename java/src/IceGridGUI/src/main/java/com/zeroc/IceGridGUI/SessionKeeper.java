@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -58,6 +58,9 @@ import java.security.MessageDigest;
 
 import javax.naming.ldap.LdapName;
 import javax.naming.ldap.Rdn;
+
+import java.net.NetworkInterface;
+import java.net.InetAddress;
 
 import com.zeroc.IceLocatorDiscovery.LookupPrx;
 import com.zeroc.IceLocatorDiscovery.LookupReplyPrx;
@@ -156,7 +159,7 @@ public class SessionKeeper
                                 logout(true);
                                 JOptionPane.showMessageDialog(
                                     parent,
-                                    "This version of IceGrid Admin requires an IceGrid Registry version 3.3",
+                                    "This version of IceGrid GUI requires a newer IceGrid Registry",
                                     "Login failed: Version Mismatch",
                                     JOptionPane.ERROR_MESSAGE);
                             });
@@ -576,7 +579,7 @@ public class SessionKeeper
         {
             if(_prefs == null)
             {
-                Preferences prefs = _coordinator.getPrefs().node("Configurations");
+                Preferences prefs = Coordinator.getPreferences().node("Configurations");
                 if(_uuid == null)
                 {
                     _uuid = java.util.UUID.randomUUID().toString();
@@ -587,7 +590,7 @@ public class SessionKeeper
             //
             // Set the first stored connection as default.
             //
-            if(_coordinator.getPrefs().node("Configurations").childrenNames().length == 1)
+            if(Coordinator.getPreferences().node("Configurations").childrenNames().length == 1)
             {
                 setIsDefault(true);
             }
@@ -1056,23 +1059,23 @@ public class SessionKeeper
     {
         ConnectionWizardDialog(JDialog parent)
         {
-            super(parent, true);
+            super(_coordinator.getMainFrame(), true);
             _x509CertificateDefault = true;
-            initialize("New Connection - IceGrid Admin", parent);
+            initialize("New Connection - IceGrid GUI", parent);
             _connectNow = true;
         }
 
         ConnectionWizardDialog(ConnectionInfo inf, JDialog parent)
         {
-            super(parent, true);
+            super(_coordinator.getMainFrame(), true);
             _conf = inf;
             _x509CertificateDefault = false;
-            initialize("Edit Connection - IceGrid Admin", parent);
+            initialize("Edit Connection - IceGrid GUI", parent);
             _connectNow = false;
             _nextButton.requestFocusInWindow();
         }
 
-        public void destroyDisconveryAdapter()
+        public void destroyDiscoveryAdapter()
         {
             synchronized(SessionKeeper.this)
             {
@@ -1107,30 +1110,15 @@ public class SessionKeeper
                         {
                             SwingUtilities.invokeLater(() ->
                                 {
-                                    try
+                                    if(_directDiscoveryEndpointModel.indexOf(locator) == -1)
                                     {
-                                        com.zeroc.Ice.Endpoint[] endps = locator.ice_getEndpoints();
-                                        for(com.zeroc.Ice.Endpoint e : endps)
-                                        {
-                                            com.zeroc.Ice.LocatorPrx prx = com.zeroc.Ice.LocatorPrx.uncheckedCast(
-                                                communicator.stringToProxy(
-                                                    communicator.identityToString(locator.ice_getIdentity()) +
-                                                        ":" + e.toString()));
-
-                                            if(_directDiscoveryEndpointModel.indexOf(prx) == -1)
-                                            {
-                                                _directDiscoveryEndpointModel.addElement(prx);
-                                            }
-                                        }
-
-                                        if(_directDiscoveryEndpointModel.size() > 0 &&
-                                            _directDiscoveryEndpointList.getSelectedIndex() == -1)
-                                        {
-                                            _directDiscoveryEndpointList.setSelectedIndex(0);
-                                        }
+                                        _directDiscoveryEndpointModel.addElement(locator);
                                     }
-                                    catch(com.zeroc.Ice.LocalException ex)
+
+                                    if(_directDiscoveryEndpointModel.size() > 0 &&
+                                        _directDiscoveryEndpointList.getSelectedIndex() == -1)
                                     {
+                                        _directDiscoveryEndpointList.setSelectedIndex(0);
                                     }
                                 });
                         }
@@ -1151,7 +1139,8 @@ public class SessionKeeper
             }
 
             final com.zeroc.Ice.Properties properties = communicator.getProperties();
-            final String intf = properties.getProperty("IceGridAdmin.Discovery.Interface");
+            final String intf = _discoveryInterfaces.getSelectedItem().toString();
+
             String lookupEndpoints = properties.getProperty("IceGridAdmin.Discovery.Lookup");
             String address;
             if(properties.getPropertyAsIntWithDefault("Ice.IPv4", 1) > 0 &&
@@ -1224,7 +1213,7 @@ public class SessionKeeper
                             catch(final com.zeroc.Ice.LocalException ex)
                             {
                                 ex.printStackTrace();
-                                destroyDisconveryAdapter();
+                                destroyDiscoveryAdapter();
                                 SwingUtilities.invokeLater(() ->
                                     {
                                         JOptionPane.showMessageDialog(ConnectionWizardDialog.this,
@@ -1244,7 +1233,7 @@ public class SessionKeeper
                                 @Override
                                 public void run()
                                 {
-                                    destroyDisconveryAdapter();
+                                    destroyDiscoveryAdapter();
                                 }
                             };
                             new java.util.Timer().schedule(_discoveryFinishTask, 2000);
@@ -1309,12 +1298,88 @@ public class SessionKeeper
                 builder.append(new JLabel("Connect to an IceGrid registry through a Glacier2 router."));
                 _cardPanel.add(builder.getPanel(), WizardStep.ConnectionTypeStep.toString());
             }
+            
+            JPanel discoveryInterface;
+            {
+                FormLayout layout = new FormLayout("pref, 2dlu, pref:grow", "pref");
+                DefaultFormBuilder builder = new DefaultFormBuilder(layout);
+                _discoveryInterfaces = new JComboBox();
+
+                builder.append("Discovery Interface:", _discoveryInterfaces);
+
+                List<String> addresses = new ArrayList<String>();
+                try
+                {
+                    Enumeration<NetworkInterface> p = NetworkInterface.getNetworkInterfaces();
+                    
+                    while(p != null && p.hasMoreElements())
+                    {
+                        NetworkInterface intf = p.nextElement();
+                        if(intf.isUp())
+                        {
+                            Enumeration<InetAddress> q = intf.getInetAddresses();
+                            while(q != null && q.hasMoreElements())
+                            {
+                                InetAddress address = q.nextElement();
+                                if(!address.isAnyLocalAddress())
+                                {
+                                    addresses.add(address.getHostAddress());
+                                }
+                            }
+                        }
+                    }
+                }
+                catch(java.net.SocketException ex)
+                {
+                    JOptionPane.showMessageDialog(ConnectionWizardDialog.this,
+                                                  ex.toString(),
+                                                  "Error retrieving network interfaces",
+                                                  JOptionPane.ERROR_MESSAGE);
+                }
+                
+                final com.zeroc.Ice.Properties properties = _coordinator.getCommunicator().getProperties();
+                String selected = properties.getPropertyWithDefault("IceGridAdmin.Discovery.Interface", "127.0.0.1");
+                if(!addresses.contains(selected))
+                {
+                    addresses.add(selected);
+                }
+
+                _discoveryInterfaces.setModel(new DefaultComboBoxModel(addresses.toArray()));
+                _discoveryInterfaces.setSelectedItem(selected);
+                _discoveryInterfaces.addActionListener(new ActionListener ()
+                    {
+                        @Override
+                        public void actionPerformed(ActionEvent e)
+                        {
+                            refreshDiscoveryEndpoints();
+                        }
+                    });
+                discoveryInterface = builder.getPanel();
+            }
 
             // Direct Discovery Endpoint List
             {
                 _directDiscoveryEndpointModel = new DefaultListModel<>();
-                _directDiscoveryEndpointList = new JList<>(_directDiscoveryEndpointModel);
+                _directDiscoveryEndpointList = new JList(_directDiscoveryEndpointModel)
+                    {
+                        @Override
+                        public String getToolTipText(MouseEvent evt)
+                        {
+                            int index = locationToIndex(evt.getPoint());
+                            if(index < 0)
+                            {
+                                return null;
+                            }
+                            Object obj = getModel().getElementAt(index);
+                            if(obj != null && obj instanceof com.zeroc.Ice.LocatorPrx)
+                            {
+                                return obj.toString();
+                            }
+                            return null;
+                        }
+                    };
                 _directDiscoveryEndpointList.setVisibleRowCount(7);
+                _directDiscoveryEndpointList.setFixedCellWidth(500);
                 _directDiscoveryEndpointList.addMouseListener(
                     new MouseAdapter()
                         {
@@ -1332,6 +1397,7 @@ public class SessionKeeper
                                 }
                             }
                         });
+                
 
                 _directDiscoveryEndpointList.addListSelectionListener(new ListSelectionListener()
                 {
@@ -1383,7 +1449,7 @@ public class SessionKeeper
                     @Override
                     public void actionPerformed(ActionEvent e)
                     {
-                        destroyDisconveryAdapter();
+                        destroyDiscoveryAdapter();
                         _directDiscoveryEndpointList.setEnabled(false);
                         _discoveryStatus.setEnabled(false);
                         _discoveryRefresh.setEnabled(false);
@@ -1398,6 +1464,7 @@ public class SessionKeeper
                     builder.border(Borders.DIALOG);
                     builder.rowGroupingEnabled(false);
                     builder.append(_directDiscoveryDiscoveredEndpoint);
+                    builder.append(discoveryInterface);
                     builder.append(createStrippedScrollPane(_directDiscoveryEndpointList));
                     builder.append(discoveryStatus);
                     builder.append(_directDiscoveryManualEndpoint);
@@ -2121,7 +2188,20 @@ public class SessionKeeper
                                 {
                                     com.zeroc.Ice.LocatorPrx locator = _directDiscoveryEndpointList.getSelectedValue();
                                     _directInstanceName.setText(locator.ice_getIdentity().category);
-                                    _directCustomEndpointValue.setText(locator.ice_getEndpoints()[0].toString());
+                                    
+                                    String endpoints = null;
+                                    for(com.zeroc.Ice.Endpoint endpoint : locator.ice_getEndpoints())
+                                    {
+                                        if(endpoints == null)
+                                        {
+                                            endpoints = endpoint.toString();
+                                        }
+                                        else
+                                        {
+                                            endpoints += ":" + endpoint.toString();
+                                        }
+                                    }
+                                    _directCustomEndpointValue.setText(endpoints);
                                     _directCustomEndpoints.setSelected(true);
 
                                     _cardLayout.show(_cardPanel, WizardStep.DirectCustomEnpointStep.toString());
@@ -2416,7 +2496,7 @@ public class SessionKeeper
                     @Override
                     public void actionPerformed(ActionEvent e)
                     {
-                        destroyDisconveryAdapter();
+                        destroyDiscoveryAdapter();
 
                         ConnectionInfo inf = getConfiguration();
                         if(inf == null)
@@ -2590,7 +2670,7 @@ public class SessionKeeper
                     @Override
                     public void actionPerformed(ActionEvent e)
                     {
-                        destroyDisconveryAdapter();
+                        destroyDiscoveryAdapter();
                         dispose();
                     }
                 };
@@ -3167,6 +3247,7 @@ public class SessionKeeper
         private JCheckBox _directConnectToMaster;
 
         // Direct Discovery Endpoints
+        private JComboBox _discoveryInterfaces;
         private JList<com.zeroc.Ice.LocatorPrx> _directDiscoveryEndpointList;
         private DefaultListModel<com.zeroc.Ice.LocatorPrx> _directDiscoveryEndpointModel;
         private JRadioButton _directDiscoveryDiscoveredEndpoint;
@@ -3282,7 +3363,7 @@ public class SessionKeeper
     {
         ConnectionDetailDialog(ConnectionInfo inf)
         {
-            super(_coordinator.getMainFrame(), "Connection Details - IceGrid Admin", true);
+            super(_coordinator.getMainFrame(), "Connection Details - IceGrid GUI", true);
             setDefaultCloseOperation(WindowConstants.DISPOSE_ON_CLOSE);
             JPanel detailsPane = null;
             {
@@ -3394,7 +3475,7 @@ public class SessionKeeper
     {
         ConnectionManagerDialog()
         {
-            super(_coordinator.getMainFrame(), "Saved Connections - IceGrid Admin", true);
+            super(_coordinator.getMainFrame(), "Saved Connections - IceGrid GUI", true);
             setDefaultCloseOperation(WindowConstants.HIDE_ON_CLOSE);
 
             JPanel connectionActionPanel = null;
@@ -3495,13 +3576,13 @@ public class SessionKeeper
 
                                 if(JOptionPane.showConfirmDialog(ConnectionManagerDialog.this,
                                         "Do you want to remove the selected configuration?",
-                                        "Remove Configuration - IceGrid admin",
+                                        "Remove Configuration - IceGrid GUI",
                                         JOptionPane.YES_NO_OPTION) == JOptionPane.YES_OPTION)
                                 {
                                     try
                                     {
                                         String uuid = inf.getUUID();
-                                        Preferences prefs = _coordinator.getPrefs().node("Configurations");
+                                        Preferences prefs = Coordinator.getPreferences().node("Configurations");
                                         prefs = prefs == null ? null : prefs.node(uuid);
                                         if(prefs != null)
                                         {
@@ -3694,7 +3775,7 @@ public class SessionKeeper
         {
             int selected = _connectionList.getSelectedIndex();
             int defaultIndex = -1;
-            Preferences prefs = _coordinator.getPrefs().node("Configurations");
+            Preferences prefs = Coordinator.getPreferences().node("Configurations");
             _connectionListModel.clear();
             try
             {
@@ -3973,7 +4054,7 @@ public class SessionKeeper
                     @Override
                     public void actionPerformed(ActionEvent e)
                     {
-                        String defaultPath = _coordinator.getPrefs().node("Configurations").get("importDirectory", "");
+                        String defaultPath = Coordinator.getPreferences().node("Configurations").get("importDirectory", "");
                         JFileChooser chooser = new JFileChooser(defaultPath.equals("") ? null : new File(defaultPath));
                         chooser.setFileFilter(new FileFilter()
                             {
@@ -4069,7 +4150,7 @@ public class SessionKeeper
                                     try
                                     {
                                         keyStore = KeyStore.getInstance("pkcs12");
-                                        RequestPasswordResult r = requestPassword("KeyStore Password - IceGrid Admin",
+                                        RequestPasswordResult r = requestPassword("KeyStore Password - IceGrid GUI",
                                                                                   "KeyStore password:");
                                         if(r.accepted)
                                         {
@@ -4137,7 +4218,7 @@ public class SessionKeeper
                                                     "<html>Your KeyStore already contains a certificate with alias `" +
                                                     newAlias + "'<br/>" +
                                                     "Do you want to update the certificate?</html>",
-                                                    "Confirm Certificate Update - IceGrid Admin",
+                                                    "Confirm Certificate Update - IceGrid GUI",
                                                     JOptionPane.YES_NO_OPTION) == JOptionPane.NO_OPTION)
                                             {
                                                 continue;
@@ -4175,7 +4256,7 @@ public class SessionKeeper
                         }
                         if(keyFile != null)
                         {
-                            _coordinator.getPrefs().node("Configurations").put("importDirectory", keyFile.getParent());
+                            Coordinator.getPreferences().node("Configurations").put("importDirectory", keyFile.getParent());
                         }
                     }
                 };
@@ -4223,7 +4304,7 @@ public class SessionKeeper
                         {
                             if(JOptionPane.showConfirmDialog(KeyStorePanel.this,
                                     "Do you want to remove the certficate with alias `" + _aliases.get(index) + "'?",
-                                    "Remove Certificate - IceGrid admin",
+                                    "Remove Certificate - IceGrid GUI",
                                     JOptionPane.YES_NO_OPTION) == JOptionPane.YES_OPTION)
                             try
                             {
@@ -4272,7 +4353,7 @@ public class SessionKeeper
                     {
                         try
                         {
-                            r = requestPassword("Certificate Password For <" + alias + "> - IceGrid Admin",
+                            r = requestPassword("Certificate Password For <" + alias + "> - IceGrid GUI",
                                                 "Certificate password for <" + alias + ">:");
                             if(r.accepted)
                             {
@@ -4313,7 +4394,7 @@ public class SessionKeeper
                             KeyStorePanel.this,
                             "<html>Your KeyStore already contains a certificate with alias `" + newAlias + "'<br/>" +
                             "Do you want to update the certificate?</html>",
-                            "Confirm Certificate Update - IceGrid Admin",
+                            "Confirm Certificate Update - IceGrid GUI",
                             JOptionPane.YES_NO_OPTION) == JOptionPane.NO_OPTION)
                         {
                             continue;
@@ -4338,7 +4419,7 @@ public class SessionKeeper
                             KeyStorePanel.this,
                             "<html>Your KeyStore already contains a certificate with alias `" + newAlias + "'<br/>" +
                             "Do you want to update the certificate?</html>",
-                            "Confirm Certificate Update - IceGrid Admin",
+                            "Confirm Certificate Update - IceGrid GUI",
                             JOptionPane.YES_NO_OPTION) == JOptionPane.NO_OPTION)
                         {
                             continue;
@@ -4631,7 +4712,7 @@ public class SessionKeeper
         CertificateDetailDialog(X509Certificate cert)
             throws java.security.GeneralSecurityException, java.io.IOException, javax.naming.InvalidNameException
         {
-            super(_coordinator.getMainFrame(), "Certificate Details - IceGrid Admin", true);
+            super(_coordinator.getMainFrame(), "Certificate Details - IceGrid GUI", true);
             setDefaultCloseOperation(WindowConstants.DISPOSE_ON_CLOSE);
 
             Container contentPane = getContentPane();
@@ -4673,7 +4754,7 @@ public class SessionKeeper
     {
         CertificateManagerDialog() throws java.security.KeyStoreException
         {
-            super(_coordinator.getMainFrame(), "Certificate Manager - IceGrid Admin", true);
+            super(_coordinator.getMainFrame(), "Certificate Manager - IceGrid GUI", true);
             _tabs = new JTabbedPane();
 
             _identityCertificatesPanel = new KeyStorePanel();
@@ -4819,7 +4900,7 @@ public class SessionKeeper
             {
                 UsernamePasswordAuthDialog()
                 {
-                    super(parent, "Login - IceGrid Admin");
+                    super(parent, "Login - IceGrid GUI");
 
                     Container contentPane = getContentPane();
                     contentPane.setLayout(new BoxLayout(contentPane, BoxLayout.Y_AXIS));
@@ -5021,7 +5102,7 @@ public class SessionKeeper
             {
                 X509CertificateAuthDialog()
                 {
-                    super(parent, "Login - IceGrid Admin");
+                    super(parent, "Login - IceGrid GUI");
 
                     Container contentPane = getContentPane();
                     contentPane.setLayout(new BoxLayout(contentPane, BoxLayout.Y_AXIS));
@@ -5239,7 +5320,7 @@ public class SessionKeeper
         {
             PermissionDeniedAuthDialog()
             {
-                super(parent, "Login - IceGrid Admin");
+                super(parent, "Login - IceGrid GUI");
 
                 Container contentPane = getContentPane();
                 contentPane.setLayout(new BoxLayout(contentPane, BoxLayout.Y_AXIS));

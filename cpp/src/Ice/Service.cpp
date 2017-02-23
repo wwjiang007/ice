@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -14,6 +14,7 @@
 #include <IceUtil/Mutex.h>
 #include <IceUtil/ArgVector.h>
 #include <IceUtil/FileUtil.h>
+#include <Ice/ConsoleUtil.h>
 #include <Ice/StringConverter.h>
 #include <Ice/Service.h>
 #include <Ice/LoggerI.h>
@@ -37,6 +38,7 @@
 
 using namespace std;
 using namespace Ice;
+using namespace IceInternal;
 
 Ice::Service* Ice::Service::_instance = 0;
 static IceUtil::CtrlCHandler* _ctrlCHandler = 0;
@@ -660,9 +662,9 @@ Ice::Service::main(int& argc, char* argv[], const InitializationData& initializa
             {
                 if(argv[0])
                 {
-                    cerr << argv[0] << ": ";
+                    consoleErr << argv[0] << ": ";
                 }
-                cerr << "--pidfile must be followed by an argument" << endl;
+                consoleErr << "--pidfile must be followed by an argument" << endl;
                 return EXIT_FAILURE;
             }
 
@@ -682,9 +684,9 @@ Ice::Service::main(int& argc, char* argv[], const InitializationData& initializa
     {
         if(argv[0])
         {
-            cerr << argv[0] << ": ";
+            consoleErr << argv[0] << ": ";
         }
-        cerr << "--noclose must be used with --daemon" << endl;
+        consoleErr << "--noclose must be used with --daemon" << endl;
         return EXIT_FAILURE;
     }
 
@@ -692,9 +694,9 @@ Ice::Service::main(int& argc, char* argv[], const InitializationData& initializa
     {
         if(argv[0])
         {
-            cerr << argv[0] << ": ";
+            consoleErr << argv[0] << ": ";
         }
-        cerr << "--pidfile <file> must be used with --daemon" << endl;
+        consoleErr << "--pidfile <file> must be used with --daemon" << endl;
         return EXIT_FAILURE;
     }
 
@@ -881,13 +883,7 @@ Ice::Service::run(int& argc, char* argv[], const InitializationData& initData)
 
     if(_communicator)
     {
-        try
-        {
-            _communicator->destroy();
-        }
-        catch(...)
-        {
-        }
+        _communicator->destroy();
     }
 
     return status;
@@ -983,15 +979,15 @@ Ice::Service::syserror(const string& msg)
     {
         if(!_name.empty())
         {
-            cerr << _name << ": ";
+            consoleErr << _name << ": ";
         }
         if(!msg.empty())
         {
-            cerr << msg << endl;
+            consoleErr << msg << endl;
         }
         if(!errmsg.empty())
         {
-            cerr << errmsg;
+            consoleErr << errmsg;
         }
     }
 }
@@ -1007,9 +1003,9 @@ Ice::Service::error(const string& msg)
     {
         if(!_name.empty())
         {
-            cerr << _name << ": ";
+            consoleErr << _name << ": ";
         }
-        cerr << "error: " << msg << endl;
+        consoleErr << "error: " << msg << endl;
     }
 }
 
@@ -1024,9 +1020,9 @@ Ice::Service::warning(const string& msg)
     {
         if(!_name.empty())
         {
-            cerr << _name << ": ";
+            consoleErr << _name << ": ";
         }
-        cerr << "warning: " << msg << endl;
+        consoleErr << "warning: " << msg << endl;
     }
 }
 
@@ -1039,7 +1035,7 @@ Ice::Service::trace(const string& msg)
     }
     else
     {
-        cerr << msg << endl;
+        consoleErr << msg << endl;
     }
 }
 
@@ -1052,7 +1048,7 @@ Ice::Service::print(const string& msg)
     }
     else
     {
-        cerr << msg << endl;
+        consoleErr << msg << endl;
     }
 }
 
@@ -1384,14 +1380,8 @@ Ice::Service::serviceMain(int argc, wchar_t* argv[])
 
     delete[] args;
 
-    try
-    {
-        assert(_communicator);
-        _communicator->destroy();
-    }
-    catch(...)
-    {
-    }
+    assert(_communicator);
+    _communicator->destroy();
 
     terminateService(status);
 }
@@ -1532,9 +1522,9 @@ Ice::Service::runDaemon(int argc, char* argv[], const InitializationData& initDa
     {
         if(argv[0])
         {
-            cerr << argv[0] << ": ";
+            consoleErr << argv[0] << ": ";
         }
-        cerr << strerror(errno) << endl;
+        consoleErr << strerror(errno) << endl;
         return EXIT_FAILURE;
     }
 
@@ -1565,9 +1555,9 @@ Ice::Service::runDaemon(int argc, char* argv[], const InitializationData& initDa
 
                 if(argv[0])
                 {
-                    cerr << argv[0] << ": ";
+                    consoleErr << argv[0] << ": ";
                 }
-                cerr << strerror(errno) << endl;
+                consoleErr << strerror(errno) << endl;
                 _exit(EXIT_FAILURE);
             }
             break;
@@ -1592,9 +1582,9 @@ Ice::Service::runDaemon(int argc, char* argv[], const InitializationData& initDa
 
                     if(argv[0])
                     {
-                        cerr << ": ";
+                        consoleErr << ": ";
                     }
-                    cerr << "I/O error while reading error message from child:\n" << strerror(errno) << endl;
+                    consoleErr << "I/O error while reading error message from child:\n" << strerror(errno) << endl;
                     _exit(EXIT_FAILURE);
                 }
                 pos += n;
@@ -1602,14 +1592,14 @@ Ice::Service::runDaemon(int argc, char* argv[], const InitializationData& initDa
             }
             if(argv[0])
             {
-                cerr << argv[0] << ": ";
+                consoleErr << argv[0] << ": ";
             }
-            cerr << "failure occurred in daemon";
+            consoleErr << "failure occurred in daemon";
             if(strlen(msg) > 0)
             {
-                cerr << ':' << endl << msg;
+                consoleErr << ':' << endl << msg;
             }
-            cerr << endl;
+            consoleErr << endl;
             _exit(EXIT_FAILURE);
         }
 
@@ -1881,13 +1871,7 @@ Ice::Service::runDaemon(int argc, char* argv[], const InitializationData& initDa
 
     if(_communicator)
     {
-        try
-        {
-            _communicator->destroy();
-        }
-        catch(...)
-        {
-        }
+        _communicator->destroy();
     }
 
     return status;

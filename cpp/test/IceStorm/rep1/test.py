@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 # **********************************************************************
 #
-# Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+# Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 #
 # This copy of Ice is licensed to you under the terms described in the
 # ICE_LICENSE file included in this distribution.
@@ -62,7 +62,7 @@ class IceStormRep1TestCase(IceStormTestCase):
                                     readyCount=0,
                                     quiet=True)
             subscriber.run(current, exitstatus=1 if expect else 0)
-            checkExpect(subscriber.getOutput(), expect)
+            checkExpect(subscriber.getOutput(current), expect)
 
         def rununsub2(replica=None, expect=None):
             sub = Subscriber(exe="sub",
@@ -77,7 +77,7 @@ class IceStormRep1TestCase(IceStormTestCase):
             # shouldn't get an AlreadySubscribedException.
             sub.run(current, exitstatus=1 if expect else 0)
             if expect:
-                checkExpect(sub.getOutput(), expect)
+                checkExpect(sub.getOutput(current), expect)
                 return
 
             sub.run(current, args=["--unsub"])

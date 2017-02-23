@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -8,15 +8,6 @@
 // **********************************************************************
 
 #import <acm/TestI.h>
-
-@interface ACMConnectionCallbackI : NSObject
-{
-    NSCondition* _cond;
-    int _count;
-}
--(void) waitForCount:(int)count;
-@end
-
 
 @implementation ACMConnectionCallbackI
 -(id) init
@@ -33,17 +24,16 @@
 -(void) heartbeat:(id<ICEConnection>)c
 {
     [_cond lock];
-    --_count;
+    ++_count;
     [_cond signal];
     [_cond unlock];
 }
 -(void) waitForCount:(int)count
 {
     [_cond lock];
-    _count = count;
     @try
     {
-        while(_count > 0)
+        while(_count < count)
         {
             [_cond wait];
         }
@@ -192,15 +182,18 @@
     [_cond signal];
     [_cond unlock];
 }
--(void) waitForHeartbeat:(int)count current:(ICECurrent*)current
+-(void) startHeartbeatCount:(ICECurrent*)current
 {
     ACMConnectionCallbackI* callback = [ACMConnectionCallbackI new];
-
+    _callback = callback;
     [current.con setHeartbeatCallback:^(id<ICEConnection> c)
     {
         [callback heartbeat:c];
     }];
-    [callback waitForCount:count];
-    ICE_RELEASE(callback);
+}
+-(void) waitForHeartbeatCount:(int)count current:(ICECurrent*)current
+{
+    [_callback waitForCount:count];
+    ICE_RELEASE(_callback);
 }
 @end

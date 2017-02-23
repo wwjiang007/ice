@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -13,9 +13,16 @@ public final class CommunicatorI implements Communicator
 {
     @Override
     public void
+    close()
+    {
+        _instance.destroy(false); // Don't allow destroy to be interrupted if called from try with statement.
+    }
+
+    @Override
+    public void
     destroy()
     {
-        _instance.destroy();
+        _instance.destroy(true); // Destroy is interruptible when call explicitly.
     }
 
     @Override
@@ -204,18 +211,18 @@ public final class CommunicatorI implements Communicator
     }
 
     @Override
-    public void flushBatchRequests()
+    public void flushBatchRequests(CompressBatch compressBatch)
     {
-        _iceI_flushBatchRequestsAsync().waitForResponse();
+        _iceI_flushBatchRequestsAsync(compressBatch).waitForResponse();
     }
 
     @Override
-    public java.util.concurrent.CompletableFuture<Void> flushBatchRequestsAsync()
+    public java.util.concurrent.CompletableFuture<Void> flushBatchRequestsAsync(CompressBatch compressBatch)
     {
-        return _iceI_flushBatchRequestsAsync();
+        return _iceI_flushBatchRequestsAsync(compressBatch);
     }
 
-    public com.zeroc.IceInternal.CommunicatorFlushBatch _iceI_flushBatchRequestsAsync()
+    public com.zeroc.IceInternal.CommunicatorFlushBatch _iceI_flushBatchRequestsAsync(CompressBatch compressBatch)
     {
         com.zeroc.IceInternal.OutgoingConnectionFactory connectionFactory = _instance.outgoingConnectionFactory();
         com.zeroc.IceInternal.ObjectAdapterFactory adapterFactory = _instance.objectAdapterFactory();
@@ -227,8 +234,8 @@ public final class CommunicatorI implements Communicator
         com.zeroc.IceInternal.CommunicatorFlushBatch f =
             new com.zeroc.IceInternal.CommunicatorFlushBatch(this, _instance);
 
-        connectionFactory.flushAsyncBatchRequests(f);
-        adapterFactory.flushAsyncBatchRequests(f);
+        connectionFactory.flushAsyncBatchRequests(compressBatch, f);
+        adapterFactory.flushAsyncBatchRequests(compressBatch, f);
 
         //
         // Inform the callback that we have finished initiating all of the
@@ -307,15 +314,23 @@ public final class CommunicatorI implements Communicator
     // Certain initialization tasks need to be completed after the
     // constructor.
     //
-    String[] finishSetup(String[] args)
+    void finishSetup(String[] args, java.util.List<String> rArgs)
     {
         try
         {
-            return _instance.finishSetup(args, this);
+            args = _instance.finishSetup(args, this);
+            if(rArgs != null)
+            {
+                rArgs.clear();
+                if(args.length > 0)
+                {
+                    rArgs.addAll(java.util.Arrays.asList(args));
+                }
+            }
         }
         catch(RuntimeException ex)
         {
-            _instance.destroy();
+            _instance.destroy(false);
             throw ex;
         }
     }

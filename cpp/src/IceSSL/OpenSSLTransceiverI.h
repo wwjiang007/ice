@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -67,6 +67,8 @@ private:
     const bool _incoming;
     const IceInternal::TransceiverPtr _delegate;
     bool _connected;
+    std::string _cipher;
+    std::vector<std::string> _certs;
     bool _verified;
     std::vector<CertificatePtr> _nativeCerts;
 

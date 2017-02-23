@@ -1,6 +1,6 @@
 # **********************************************************************
 #
-# Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+# Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 #
 # This copy of Ice is licensed to you under the terms described in the
 # ICE_LICENSE file included in this distribution.
@@ -106,7 +106,7 @@ def allTests(communicator):
     i = initial.getI()
     test(i)
     j = initial.getJ()
-    test(isinstance(j, Test.J))
+    test(isinstance(j, TestI.JI))
     h = initial.getH()
     test(isinstance(h, Test.H))
     print("ok")

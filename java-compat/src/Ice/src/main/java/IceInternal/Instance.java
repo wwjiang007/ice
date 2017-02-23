@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -1121,7 +1121,7 @@ public final class Instance implements Ice.ClassResolver
         }
         catch(Ice.LocalException ex)
         {
-            destroy();
+            destroy(false);
             throw ex;
         }
     }
@@ -1348,9 +1348,9 @@ public final class Instance implements Ice.ClassResolver
     //
     @SuppressWarnings("deprecation")
     public void
-    destroy()
+    destroy(boolean interruptible)
     {
-        if(Thread.interrupted())
+        if(interruptible && Thread.interrupted())
         {
             throw new Ice.OperationInterruptedException();
         }
@@ -1370,7 +1370,10 @@ public final class Instance implements Ice.ClassResolver
                 }
                 catch(InterruptedException ex)
                 {
-                    throw new Ice.OperationInterruptedException();
+                    if(interruptible)
+                    {
+                        throw new Ice.OperationInterruptedException();
+                    }
                 }
             }
 
@@ -1479,7 +1482,10 @@ public final class Instance implements Ice.ClassResolver
             }
             catch(InterruptedException ex)
             {
-                throw new Ice.OperationInterruptedException();
+                if(interruptible)
+                {
+                    throw new Ice.OperationInterruptedException();
+                }
             }
 
             //
@@ -1570,6 +1576,7 @@ public final class Instance implements Ice.ClassResolver
             {
                 if(_state == StateDestroyInProgress)
                 {
+                    assert(interruptible);
                     _state = StateActive;
                     notifyAll();
                 }

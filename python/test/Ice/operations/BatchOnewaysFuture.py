@@ -1,6 +1,6 @@
 # **********************************************************************
 #
-# Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+# Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 #
 # This copy of Ice is licensed to you under the terms described in the
 # ICE_LICENSE file included in this distribution.
@@ -45,7 +45,7 @@ def batchOneways(p):
 
     test(batch.ice_flushBatchRequestsAsync().is_sent()) # Empty flush
     test(batch.ice_flushBatchRequestsAsync().done()) # Empty flush
-    test(batch.ice_flushBatchRequestsAsync().sent_synchronously()) # Empty flush
+    test(batch.ice_flushBatchRequestsAsync().is_sent_synchronously()) # Empty flush
 
     for i in range(30):
         batch.opByteSOnewayAsync(bs1)
@@ -63,14 +63,14 @@ def batchOneways(p):
         batch1.ice_pingAsync()
         batch2.ice_pingAsync()
         batch1.ice_flushBatchRequestsAsync().result()
-        batch1.ice_getConnection().close(False)
+        batch1.ice_getConnection().close(Ice.ConnectionClose.GracefullyWithWait)
         batch1.ice_pingAsync()
         batch2.ice_pingAsync()
 
         batch1.ice_getConnection()
         batch2.ice_getConnection()
 
-        batch1.ice_getConnection().close(False)
+        batch1.ice_getConnection().close(Ice.ConnectionClose.GracefullyWithWait)
 
         test(not batch1.ice_pingAsync().done())
         test(not batch2.ice_pingAsync().done())

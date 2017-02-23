@@ -1,6 +1,6 @@
 ﻿// **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -8,6 +8,7 @@
 // **********************************************************************
 
 using System;
+using System.ComponentModel;
 
 namespace Ice
 {
@@ -50,6 +51,7 @@ namespace Ice
         {
         }
 
+        [EditorBrowsable(EditorBrowsableState.Never)]
         public virtual void iceWrite(OutputStream ostr)
         {
             ostr.startValue(null);
@@ -57,6 +59,7 @@ namespace Ice
             ostr.endValue();
         }
 
+        [EditorBrowsable(EditorBrowsableState.Never)]
         public virtual void iceRead(InputStream istr)
         {
             istr.startValue();
@@ -64,10 +67,12 @@ namespace Ice
             istr.endValue(false);
         }
 
+        [EditorBrowsable(EditorBrowsableState.Never)]
         protected virtual void iceWriteImpl(OutputStream ostr)
         {
         }
 
+        [EditorBrowsable(EditorBrowsableState.Never)]
         protected virtual void iceReadImpl(InputStream istr)
         {
         }
@@ -95,12 +100,14 @@ namespace Ice
             return _id;
         }
 
+        [EditorBrowsable(EditorBrowsableState.Never)]
         protected override void iceWriteImpl(OutputStream ostr)
         {
             ostr.startSlice(ice_id(), -1, true);
             ostr.endSlice();
         }
 
+        [EditorBrowsable(EditorBrowsableState.Never)]
         protected override void iceReadImpl(InputStream istr)
         {
             istr.startSlice();

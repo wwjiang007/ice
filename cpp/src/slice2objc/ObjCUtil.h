@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -81,7 +81,6 @@ private:
     class MetaDataVisitor : public ParserVisitor
     {
     public:
-        MetaDataVisitor();
 
         virtual bool visitUnitStart(const UnitPtr&);
         virtual bool visitModuleStart(const ModulePtr&);
@@ -106,12 +105,11 @@ private:
         void validate(const ContainedPtr&);
 
         static Slice::StringList getMetaData(const ContainedPtr&);
+        static void setMetaData(const ContainedPtr&, const Slice::StringList&);
         static void modulePrefixError(const ModulePtr&, const std::string&);
 
         static const std::string _objcPrefix; // "objc:"
         static const std::string _msg; // "ignoring invalid metadata"
-
-        StringSet _history;
     };
 
 

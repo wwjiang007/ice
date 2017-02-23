@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -22,9 +22,9 @@ run(int, char**, const Ice::CommunicatorPtr& communicator)
 {
     communicator->getProperties()->setProperty("TestAdapter.Endpoints", getTestEndpoint(communicator, 0));
     Ice::ObjectAdapterPtr adapter = communicator->createObjectAdapter("TestAdapter");
-    adapter->add(ICE_MAKE_SHARED(TestIntfI,communicator), Ice::stringToIdentity("test"));
-    adapter->add(ICE_MAKE_SHARED(Test1::WstringClassI), Ice::stringToIdentity("wstring1"));
-    adapter->add(ICE_MAKE_SHARED(Test2::WstringClassI), Ice::stringToIdentity("wstring2"));
+    adapter->add(ICE_MAKE_SHARED(TestIntfI,communicator), Ice::stringToIdentity("TEST"));
+    adapter->add(ICE_MAKE_SHARED(Test1::WstringClassI), Ice::stringToIdentity("WSTRING1"));
+    adapter->add(ICE_MAKE_SHARED(Test2::WstringClassI), Ice::stringToIdentity("WSTRING2"));
 
     adapter->activate();
     TEST_READY
@@ -59,15 +59,7 @@ main(int argc, char** argv)
 
     if(communicator)
     {
-        try
-        {
-            communicator->destroy();
-        }
-        catch(const Ice::Exception& ex)
-        {
-            cerr << ex << endl;
-            status = EXIT_FAILURE;
-        }
+        communicator->destroy();
     }
 
     return status;

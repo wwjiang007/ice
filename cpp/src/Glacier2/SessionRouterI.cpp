@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -80,7 +80,7 @@ public:
             // Close the connection otherwise the peer has no way to know that
             // the session has gone.
             //
-            _connection->close(true);
+            _connection->close(ICE_SCOPED_ENUM(ConnectionClose, Forcefully));
             _router->destroySession(_connection);
         }
     }
@@ -922,7 +922,7 @@ SessionRouterI::refreshSession(const Ice::ConnectionPtr& con)
             // Close the connection otherwise the peer has no way to know that the
             // session has gone.
             //
-            con->close(true);
+            con->close(ICE_SCOPED_ENUM(ConnectionClose, Forcefully));
             throw SessionNotExistException();
         }
     }
@@ -1149,10 +1149,10 @@ SessionRouterI::getRouterImpl(const ConnectionPtr& connection, const Ice::Identi
         if(_rejectTraceLevel >= 1)
         {
             Trace out(_instance->logger(), "Glacier2");
-            out << "rejecting request. no session is associated with the connection.\n";
-            out << "identity: " << _instance->communicator()->identityToString(id);
+            out << "rejecting request, no session is associated with the connection.\n";
+            out << "identity: " << identityToString(id);
         }
-        connection->close(true);
+        connection->close(ICE_SCOPED_ENUM(ConnectionClose, Forcefully));
         throw ObjectNotExistException(__FILE__, __LINE__);
     }
     return 0;

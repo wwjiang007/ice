@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -402,7 +402,7 @@ StreamSocket::startWrite(Buffer& buf)
 
     _write.buf.len = static_cast<DWORD>(packetSize);
     _write.buf.buf = reinterpret_cast<char*>(&*buf.i);
-    int err = WSASend(_fd, &_write.buf, 1, &_write.count, 0, &_write, NULL);
+    int err = WSASend(_fd, &_write.buf, 1, &_write.count, 0, &_write, ICE_NULLPTR);
     if(err == SOCKET_ERROR)
     {
         if(!wouldBlock())
@@ -465,7 +465,7 @@ StreamSocket::startRead(Buffer& buf)
     size_t packetSize = getRecvPacketSize(length);
     _read.buf.len = static_cast<DWORD>(packetSize);
     _read.buf.buf = reinterpret_cast<char*>(&*buf.i);
-    int err = WSARecv(_fd, &_read.buf, 1, &_read.count, &_read.flags, &_read, NULL);
+    int err = WSARecv(_fd, &_read.buf, 1, &_read.count, &_read.flags, &_read, ICE_NULLPTR);
     if(err == SOCKET_ERROR)
     {
         if(!wouldBlock())

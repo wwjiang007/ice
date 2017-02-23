@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -465,7 +465,7 @@ ReplicaSessionPrx
 ReplicaSessionManager::createSession(InternalRegistryPrx& registry, IceUtil::Time& timeout)
 {
     ReplicaSessionPrx session;
-    IceUtil::UniquePtr<Ice::Exception> exception;
+    IceInternal::UniquePtr<Ice::Exception> exception;
     try
     {
         if(_traceLevels && _traceLevels->replica > 1)

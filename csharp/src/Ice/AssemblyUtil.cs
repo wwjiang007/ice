@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -9,7 +9,6 @@
 
 namespace IceInternal
 {
-
     using System;
     using System.Collections;
     using System.Collections.Generic;
@@ -139,7 +138,7 @@ namespace IceInternal
                         _loadedAssemblies[ra.FullName] = ra;
                         loadReferencedAssemblies(ra);
                     }
-                    catch(System.Exception)
+                    catch(Exception)
                     {
                         // Ignore assemblies that cannot be loaded.
                     }

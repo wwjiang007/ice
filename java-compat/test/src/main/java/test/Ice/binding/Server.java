@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -30,6 +30,33 @@ public class Server extends test.Util.Application
         Ice.InitializationData initData = super.getInitData(argsH);
         initData.properties.setProperty("Ice.Package.Test", "test.Ice.binding");
         initData.properties.setProperty("TestAdapter.Endpoints", getTestEndpoint(initData.properties, 0) + ":udp");
+        initData.logger = new Ice.Logger() {
+            @Override public void print(String message)
+            {
+            }
+
+            @Override public void trace(String category, String message)
+            {
+            }
+
+            @Override public void warning(String message)
+            {
+            }
+
+            @Override public void error(String message)
+            {
+            }
+
+            @Override public String getPrefix()
+            {
+                return "NullLogger";
+            }
+
+            @Override public Ice.Logger cloneWithPrefix(String prefix)
+            {
+                return this;
+            }
+        };
         return initData;
     }
 

@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -10,7 +10,6 @@
 namespace Ice
 {
     using System;
-    using System.Collections;
     using System.Collections.Generic;
     using System.Diagnostics;
     using System.Text;
@@ -73,11 +72,11 @@ namespace Ice
 
             try
             {
-                Ice.Identity dummy = new Ice.Identity();
+                Identity dummy = new Identity();
                 dummy.name = "dummy";
                 updateLocatorRegistry(locatorInfo, createDirectProxy(dummy));
             }
-            catch(Ice.LocalException)
+            catch(LocalException)
             {
                 //
                 // If we couldn't update the locator registry, we let the
@@ -183,7 +182,7 @@ namespace Ice
             {
                 updateLocatorRegistry(_locatorInfo, null);
             }
-            catch(Ice.LocalException)
+            catch(LocalException)
             {
                 //
                 // We can't throw exceptions in deactivate so we ignore
@@ -327,12 +326,12 @@ namespace Ice
             }
         }
 
-        public ObjectPrx add(Ice.Object obj, Identity ident)
+        public ObjectPrx add(Object obj, Identity ident)
         {
             return addFacet(obj, ident, "");
         }
 
-        public ObjectPrx addFacet(Ice.Object obj, Identity ident, string facet)
+        public ObjectPrx addFacet(Object obj, Identity ident, string facet)
         {
             lock(this)
             {
@@ -354,12 +353,12 @@ namespace Ice
             }
         }
 
-        public ObjectPrx addWithUUID(Ice.Object obj)
+        public ObjectPrx addWithUUID(Object obj)
         {
             return addFacetWithUUID(obj, "");
         }
 
-        public ObjectPrx addFacetWithUUID(Ice.Object obj, string facet)
+        public ObjectPrx addFacetWithUUID(Object obj, string facet)
         {
             Identity ident = new Identity();
             ident.category = "";
@@ -380,12 +379,12 @@ namespace Ice
             }
         }
 
-        public Ice.Object remove(Identity ident)
+        public Object remove(Identity ident)
         {
             return removeFacet(ident, "");
         }
 
-        public Ice.Object removeFacet(Identity ident, string facet)
+        public Object removeFacet(Identity ident, string facet)
         {
             lock(this)
             {
@@ -396,7 +395,7 @@ namespace Ice
             }
         }
 
-        public Dictionary<string, Ice.Object> removeAllFacets(Identity ident)
+        public Dictionary<string, Object> removeAllFacets(Identity ident)
         {
             lock(this)
             {
@@ -407,7 +406,7 @@ namespace Ice
             }
         }
 
-        public Ice.Object removeDefaultServant(string category)
+        public Object removeDefaultServant(string category)
         {
             lock(this)
             {
@@ -417,12 +416,12 @@ namespace Ice
             }
         }
 
-        public Ice.Object find(Identity ident)
+        public Object find(Identity ident)
         {
             return findFacet(ident, "");
         }
 
-        public Ice.Object findFacet(Identity ident, string facet)
+        public Object findFacet(Identity ident, string facet)
         {
             lock(this)
             {
@@ -433,7 +432,7 @@ namespace Ice
             }
         }
 
-        public Dictionary<string, Ice.Object> findAllFacets(Identity ident)
+        public Dictionary<string, Object> findAllFacets(Identity ident)
         {
             lock(this)
             {
@@ -444,7 +443,7 @@ namespace Ice
             }
         }
 
-        public Ice.Object findByProxy(ObjectPrx proxy)
+        public Object findByProxy(ObjectPrx proxy)
         {
             lock(this)
             {
@@ -455,7 +454,7 @@ namespace Ice
             }
         }
 
-        public Ice.Object findDefaultServant(string category)
+        public Object findDefaultServant(string category)
         {
             lock(this)
             {
@@ -555,6 +554,19 @@ namespace Ice
             }
         }
 
+        public Endpoint[] getEndpoints()
+        {
+            lock(this)
+            {
+                List<Endpoint> endpoints = new List<Endpoint>();
+                foreach(IncomingConnectionFactory factory in _incomingConnectionFactories)
+                {
+                    endpoints.Add(factory.endpoint());
+                }
+                return endpoints.ToArray();
+            }
+        }
+
         public void refreshPublishedEndpoints()
         {
             LocatorInfo locatorInfo = null;
@@ -572,11 +584,11 @@ namespace Ice
 
             try
             {
-                Ice.Identity dummy = new Ice.Identity();
+                Identity dummy = new Identity();
                 dummy.name = "dummy";
                 updateLocatorRegistry(locatorInfo, createDirectProxy(dummy));
             }
-            catch(Ice.LocalException)
+            catch(LocalException)
             {
                 lock(this)
                 {
@@ -589,24 +601,52 @@ namespace Ice
             }
         }
 
-        public Endpoint[] getEndpoints()
-        {
-            lock(this)
-            {
-                List<Endpoint> endpoints = new List<Endpoint>();
-                foreach(IncomingConnectionFactory factory in _incomingConnectionFactories)
-                {
-                    endpoints.Add(factory.endpoint());
-                }
-                return endpoints.ToArray();
-            }
-        }
-
         public Endpoint[] getPublishedEndpoints()
         {
             lock(this)
             {
                 return _publishedEndpoints.ToArray();
+            }
+        }
+
+        public void setPublishedEndpoints(Endpoint[] newEndpoints)
+        {
+            List<EndpointI> newPublishedEndpoints = new List<EndpointI>(newEndpoints.Length);
+
+            foreach(Endpoint e in newEndpoints)
+            {
+                newPublishedEndpoints.Add((EndpointI)e);
+            }
+
+            LocatorInfo locatorInfo = null;
+            List<EndpointI> oldPublishedEndpoints;
+
+            lock(this)
+            {
+                checkForDeactivation();
+
+                oldPublishedEndpoints = _publishedEndpoints;
+                _publishedEndpoints = newPublishedEndpoints;
+
+                locatorInfo = _locatorInfo;
+            }
+
+            try
+            {
+                Identity dummy = new Identity();
+                dummy.name = "dummy";
+                updateLocatorRegistry(locatorInfo, createDirectProxy(dummy));
+            }
+            catch(LocalException)
+            {
+                lock(this)
+                {
+                    //
+                    // Restore the old published endpoints.
+                    //
+                    _publishedEndpoints = oldPublishedEndpoints;
+                    throw;
+                }
             }
         }
 
@@ -689,7 +729,7 @@ namespace Ice
             }
         }
 
-        public void flushAsyncBatchRequests(CommunicatorFlushBatchAsync outAsync)
+        public void flushAsyncBatchRequests(Ice.CompressBatch compressBatch, CommunicatorFlushBatchAsync outAsync)
         {
             List<IncomingConnectionFactory> f;
             lock(this)
@@ -699,7 +739,7 @@ namespace Ice
 
             foreach(IncomingConnectionFactory factory in f)
             {
-                factory.flushAsyncBatchRequests(outAsync);
+                factory.flushAsyncBatchRequests(compressBatch, outAsync);
             }
         }
 
@@ -924,9 +964,9 @@ namespace Ice
                         //
                         if(_routerInfo.getAdapter() != null)
                         {
-                            Ice.AlreadyRegisteredException ex = new Ice.AlreadyRegisteredException();
+                            AlreadyRegisteredException ex = new AlreadyRegisteredException();
                             ex.kindOfObject = "object adapter with router";
-                            ex.id = Ice.Util.identityToString(router.ice_getIdentity(), _instance.toStringMode());
+                            ex.id = Util.identityToString(router.ice_getIdentity(), _instance.toStringMode());
                             throw ex;
                         }
 
@@ -1098,7 +1138,7 @@ namespace Ice
             }
         }
 
-        private static void checkServant(Ice.Object servant)
+        private static void checkServant(Object servant)
         {
             if(servant == null)
             {
@@ -1119,13 +1159,17 @@ namespace Ice
                 beg = IceUtilInternal.StringUtil.findFirstNotOf(endpts, delim, end);
                 if(beg == -1)
                 {
+                    if(endpoints.Count != 0)
+                    {
+                        throw new EndpointParseException("invalid empty object adapter endpoint");
+                    }
                     break;
                 }
 
                 end = beg;
                 while(true)
                 {
-                    end = endpts.IndexOf((System.Char) ':', end);
+                    end = endpts.IndexOf(':', end);
                     if(end == -1)
                     {
                         end = endpts.Length;
@@ -1137,14 +1181,14 @@ namespace Ice
                         int quote = beg;
                         while(true)
                         {
-                            quote = endpts.IndexOf((System.Char) '\"', quote);
+                            quote = endpts.IndexOf('\"', quote);
                             if(quote == -1 || end < quote)
                             {
                                 break;
                             }
                             else
                             {
-                                quote = endpts.IndexOf((System.Char) '\"', ++quote);
+                                quote = endpts.IndexOf('\"', ++quote);
                                 if(quote == -1)
                                 {
                                     break;
@@ -1167,17 +1211,14 @@ namespace Ice
 
                 if(end == beg)
                 {
-                    ++end;
-                    continue;
+                    throw new EndpointParseException("invalid empty object adapter endpoint");
                 }
 
                 string s = endpts.Substring(beg, (end) - (beg));
                 EndpointI endp = _instance.endpointFactoryManager().create(s, oaEndpoints);
                 if(endp == null)
                 {
-                    Ice.EndpointParseException e2 = new Ice.EndpointParseException();
-                    e2.str = "invalid object adapter endpoint `" + s + "'";
-                    throw e2;
+                    throw new EndpointParseException("invalid object adapter endpoint `" + s + "'");
                 }
                 endpoints.Add(endp);
 
@@ -1260,7 +1301,7 @@ namespace Ice
             {
                 if(_instance.traceLevels().location >= 1)
                 {
-                    System.Text.StringBuilder s = new System.Text.StringBuilder();
+                    StringBuilder s = new StringBuilder();
                     s.Append("couldn't update object adapter `" + _id + "' endpoints with the locator registry:\n");
                     s.Append("the object adapter is not known to the locator registry");
                     _instance.initializationData().logger.trace(_instance.traceLevels().locationCat, s.ToString());
@@ -1275,7 +1316,7 @@ namespace Ice
             {
                 if(_instance.traceLevels().location >= 1)
                 {
-                    System.Text.StringBuilder s = new System.Text.StringBuilder();
+                    StringBuilder s = new StringBuilder();
                     s.Append("couldn't update object adapter `" + _id + "' endpoints with the locator registry:\n");
                     s.Append("the replica group `" + _replicaGroupId + "' is not known to the locator registry");
                     _instance.initializationData().logger.trace(_instance.traceLevels().locationCat, s.ToString());
@@ -1290,7 +1331,7 @@ namespace Ice
             {
                 if(_instance.traceLevels().location >= 1)
                 {
-                    System.Text.StringBuilder s = new System.Text.StringBuilder();
+                    StringBuilder s = new StringBuilder();
                     s.Append("couldn't update object adapter `" + _id + "' endpoints with the locator registry:\n");
                     s.Append("the object adapter endpoints are already set");
                     _instance.initializationData().logger.trace(_instance.traceLevels().locationCat, s.ToString());
@@ -1312,7 +1353,7 @@ namespace Ice
             {
                 if(_instance.traceLevels().location >= 1)
                 {
-                    System.Text.StringBuilder s = new System.Text.StringBuilder();
+                    StringBuilder s = new StringBuilder();
                     s.Append("couldn't update object adapter `" + _id + "' endpoints with the locator registry:\n");
                     s.Append(e.ToString());
                     _instance.initializationData().logger.trace(_instance.traceLevels().locationCat, s.ToString());
@@ -1322,12 +1363,12 @@ namespace Ice
 
             if(_instance.traceLevels().location >= 1)
             {
-                System.Text.StringBuilder s = new System.Text.StringBuilder();
+                StringBuilder s = new StringBuilder();
                 s.Append("updated object adapter `" + _id + "' endpoints with the locator registry\n");
                 s.Append("endpoints = ");
                 if(proxy != null)
                 {
-                    Ice.Endpoint[] endpoints = proxy.ice_getEndpoints();
+                    Endpoint[] endpoints = proxy.ice_getEndpoints();
                     for(int i = 0; i < endpoints.Length; i++)
                     {
                         s.Append(endpoints[i].ToString());
@@ -1388,7 +1429,7 @@ namespace Ice
             // Do not create unknown properties list if Ice prefix, ie Ice, Glacier2, etc
             //
             bool addUnknown = true;
-            String prefix = _name + ".";
+            string prefix = _name + ".";
             for(int i = 0; PropertyNames.clPropNames[i] != null; ++i)
             {
                 if(prefix.StartsWith(PropertyNames.clPropNames[i] + ".", StringComparison.Ordinal))
@@ -1401,7 +1442,7 @@ namespace Ice
             bool noProps = true;
             Dictionary<string, string> props =
                 _instance.initializationData().properties.getPropertiesForPrefix(prefix);
-            foreach(String prop in props.Keys)
+            foreach(string prop in props.Keys)
             {
                 bool valid = false;
                 for(int i = 0; i < _suffixes.Length; ++i)

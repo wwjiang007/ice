@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -30,7 +30,7 @@ using namespace Windows::Security::Cryptography::Certificates;
 
 namespace
 {
-    
+
 std::string
 validationResultToString(ChainValidationResult result)
 {
@@ -143,7 +143,7 @@ IceSSL::TransceiverI::initialize(IceInternal::Buffer& readBuffer, IceInternal::B
                 params->CurrentTimeValidationEnabled = true;
                 params->NetworkRetrievalEnabled = false;
                 params->RevocationCheckEnabled = false;
-                
+
                 //
                 // BUGFIX: It is currently not possible to set ExclusiveTrustRoots programatically
                 // it is causing a read access exception see:https://goo.gl/B6OaNx
@@ -152,37 +152,18 @@ IceSSL::TransceiverI::initialize(IceInternal::Buffer& readBuffer, IceInternal::B
                 //{
                 // params->ExclusiveTrustRoots->Append(_engine->ca()->getCert());
                 //}
-
-                promise<CertificateChain^> p;
-                create_task(fd->Information->ServerCertificate->BuildChainAsync(
-                                fd->Information->ServerIntermediateCertificates, params)).then(
-                        [&](task<CertificateChain^> previous)
-                        {
-                            try
-                            {
-                                p.set_value(previous.get());
-                            }
-                            catch(Platform::Exception^ ex)
-                            {
-                                try
-                                {
-                                    throw SyscallException(__FILE__, __LINE__, ex->HResult);
-                                }
-                                catch(...)
-                                {
-                                    p.set_exception(current_exception());
-                                }
-                            }
-                        });
-
-                _chain = p.get_future().get();
+                try
+                {
+                    _chain = create_task(fd->Information->ServerCertificate->BuildChainAsync(
+                                         fd->Information->ServerIntermediateCertificates, params)).get();
+                }
+                catch(Platform::Exception^ ex)
+                {
+                    throw SyscallException(__FILE__, __LINE__, ex->HResult);
+                }
 
                 ChainValidationResult result = _chain->Validate();
-                //
-                // Ignore InvalidName errors here SSLEngine::verifyPeer already checks that
-                // using IceSSL.CheckCertName settings.
-                //
-                if(result != ChainValidationResult::InvalidName && result != ChainValidationResult::Success)
+                if(result != ChainValidationResult::Success)
                 {
                     if(_engine->getVerifyPeer() == 0)
                     {
@@ -211,6 +192,17 @@ IceSSL::TransceiverI::initialize(IceInternal::Buffer& readBuffer, IceInternal::B
                 // certificate if VerifyPeer == 2
                 //
                 throw SecurityException(__FILE__, __LINE__, "IceSSL: certificate required");
+            }
+
+            if(_chain)
+            {
+                auto certs = _chain->GetCertificates(true);
+                for(auto iter = certs->First(); iter->HasCurrent; iter->MoveNext())
+                {
+                    auto cert = ICE_MAKE_SHARED(Certificate, iter->Current);
+                    _nativeCerts.push_back(cert);
+                    _certs.push_back(cert->encode());
+                }
             }
 
             _engine->verifyPeer(_host, dynamic_pointer_cast<IceSSL::NativeConnectionInfo>(getInfo()), toString());
@@ -263,7 +255,13 @@ IceSSL::TransceiverI::startWrite(IceInternal::Buffer& buf)
         //
         stream->Control->IgnorableServerCertificateErrors->Append(ChainValidationResult::Expired);
         stream->Control->IgnorableServerCertificateErrors->Append(ChainValidationResult::IncompleteChain);
-        stream->Control->IgnorableServerCertificateErrors->Append(ChainValidationResult::InvalidName);
+        //
+        // Check if we need to enable host name verification
+        //
+        if(!_engine->getCheckCertName() || _host.empty())
+        {
+            stream->Control->IgnorableServerCertificateErrors->Append(ChainValidationResult::InvalidName);
+        }
         stream->Control->IgnorableServerCertificateErrors->Append(ChainValidationResult::RevocationFailure);
         stream->Control->IgnorableServerCertificateErrors->Append(ChainValidationResult::RevocationInformationMissing);
         stream->Control->IgnorableServerCertificateErrors->Append(ChainValidationResult::Untrusted);
@@ -296,6 +294,25 @@ IceSSL::TransceiverI::finishWrite(IceInternal::Buffer& buf)
         IceInternal::AsyncInfo* asyncInfo = getNativeInfo()->getAsyncInfo(IceInternal::SocketOperationWrite);
         if(asyncInfo->count == SOCKET_ERROR)
         {
+            if(CERT_E_CN_NO_MATCH == asyncInfo->error)
+            {
+                ostringstream ostr;
+                ostr << "IceSSL: certificate validation failure: "
+                     << (IceInternal::isIpAddress(_host) ? "IP address mismatch" : "Hostname mismatch");
+                string msg = ostr.str();
+                if(_engine->securityTraceLevel() >= 1)
+                {
+                    Trace out(_logger, _securityTraceCategory);
+                    out << msg;
+                }
+
+                if(_engine->getVerifyPeer() > 0)
+                {
+                    SecurityException ex(__FILE__, __LINE__);
+                    ex.reason = msg;
+                    throw ex;
+                }
+            }
             IceInternal::checkErrorCode(__FILE__, __LINE__, asyncInfo->error);
         }
         return;
@@ -337,20 +354,12 @@ Ice::ConnectionInfoPtr
 IceSSL::TransceiverI::getInfo() const
 {
     NativeConnectionInfoPtr info = ICE_MAKE_SHARED(NativeConnectionInfo);
-    StreamSocket^ stream = safe_cast<StreamSocket^>(_delegate->getNativeInfo()->fd());
-    if(_chain)
-    {
-        auto certs = _chain->GetCertificates(true);
-        for(auto iter = certs->First(); iter->HasCurrent; iter->MoveNext())
-        {
-            info->nativeCerts.push_back(ICE_MAKE_SHARED(Certificate, iter->Current));
-            info->certs.push_back(info->nativeCerts.back()->encode());
-        }
-    }
     info->verified = _verified;
     info->adapterName = _adapterName;
     info->incoming = _incoming;
     info->underlying = _delegate->getInfo();
+    info->certs = _certs;
+    info->nativeCerts = _nativeCerts;
     return info;
 }
 

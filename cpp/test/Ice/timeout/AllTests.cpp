@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -294,7 +294,7 @@ allTests(const Ice::CommunicatorPtr& communicator)
         TimeoutPrxPtr to = ICE_CHECKED_CAST(TimeoutPrx, obj->ice_timeout(250));
         Ice::ConnectionPtr connection = to->ice_getConnection();
         timeout->holdAdapter(600);
-        connection->close(false);
+        connection->close(Ice::ICE_SCOPED_ENUM(ConnectionClose, GracefullyWithWait));
         try
         {
             connection->getInfo(); // getInfo() doesn't throw in the closing state.
@@ -309,9 +309,10 @@ allTests(const Ice::CommunicatorPtr& communicator)
             connection->getInfo();
             test(false);
         }
-        catch(const Ice::CloseConnectionException&)
+        catch(const Ice::ConnectionManuallyClosedException& ex)
         {
             // Expected.
+            test(ex.graceful);
         }
         timeout->op(); // Ensure adapter is active.
     }
@@ -453,6 +454,20 @@ allTests(const Ice::CommunicatorPtr& communicator)
         }
         catch(const Ice::InvocationTimeoutException&)
         {
+        }
+
+        try
+        {
+            timeout->ice_invocationTimeout(-2)->ice_ping();
+            #ifdef ICE_CPP11_MAPPING
+            timeout->ice_invocationTimeout(-2)->ice_pingAsync().get();
+            #else
+            timeout->ice_invocationTimeout(-2)->begin_ice_ping()->waitForCompleted();
+            #endif
+        }
+        catch(const Ice::Exception&)
+        {
+            test(false);
         }
 
         TimeoutPrxPtr batchTimeout = timeout->ice_batchOneway();

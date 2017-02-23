@@ -1,6 +1,6 @@
 # **********************************************************************
 #
-# Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+# Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 #
 # This copy of Ice is licensed to you under the terms described in the
 # ICE_LICENSE file included in this distribution.
@@ -110,6 +110,7 @@ class reader(threading.Thread):
                 c = self.p.stdout.read(1)
                 if not c:
                     self.cv.acquire()
+                    self.trace(None)
                     self._finish = True # We have finished processing output
                     self.cv.notify()
                     self.cv.release()
@@ -135,8 +136,9 @@ class reader(threading.Thread):
     def trace(self, c):
         if self._trace:
             if self._tracesuppress:
-                self._tbuf.write(c)
-                if c == '\n':
+                if not c is None:
+                    self._tbuf.write(c)
+                if c == '\n' or c is None:
                     content = self._tbuf.getvalue()
                     suppress = False
                     for p in self._tracesuppress:
@@ -149,7 +151,7 @@ class reader(threading.Thread):
                         sys.stdout.write(content)
                     self._tbuf.truncate(0)
                     self._tbuf.seek(0)
-            else:
+            elif not c is None:
                 sys.stdout.write(c)
                 sys.stdout.flush()
 
@@ -354,7 +356,8 @@ def signal_handler(signal, frame):
 #signal.signal(signal.SIGTERM, signal_handler)
 
 class Expect (object):
-    def __init__(self, command, startReader = True, timeout=30, logfile=None, mapping = None, desc = None, cwd = None, env = None):
+    def __init__(self, command, startReader=True, timeout=30, logfile=None, mapping=None, desc=None, cwd=None, env=None,
+                 preexec_fn=None):
         self.buf = "" # The part before the match
         self.before = "" # The part before the match
         self.after = "" # The part after the match
@@ -384,12 +387,13 @@ class Expect (object):
             # command.
             #
             CREATE_NEW_PROCESS_GROUP = 512
-            self.p = subprocess.Popen(command, env = env, cwd = cwd, shell=False, bufsize=0, stdin=subprocess.PIPE,
+            self.p = subprocess.Popen(command, env=env, cwd=cwd, shell=False, bufsize=0, stdin=subprocess.PIPE,
                                       stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                                       creationflags = CREATE_NEW_PROCESS_GROUP, universal_newlines=True)
         else:
-            self.p = subprocess.Popen(splitCommand(command), env = env, cwd = cwd, shell=False, bufsize=0,
-                                      stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+            self.p = subprocess.Popen(splitCommand(command), env=env, cwd=cwd, shell=False, bufsize=0,
+                                      stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                                      preexec_fn=preexec_fn)
         global processes
         processes[self.p.pid] = self.p
 
@@ -609,7 +613,7 @@ class Expect (object):
 
         try:
             self.wait(timeout)
-            if self.mapping == "java":
+            if self.mapping in ["java", "java-compat"]:
                 if self.killed is not None:
                     if win32:
                         test(self.exitstatus, -self.killed)

@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -85,6 +85,10 @@ static PyMethodDef methods[] =
         PyDoc_STR(STRCAST("internal function")) },
     { STRCAST("defineClass"), reinterpret_cast<PyCFunction>(IcePy_defineClass), METH_VARARGS,
         PyDoc_STR(STRCAST("internal function")) },
+    { STRCAST("declareValue"), reinterpret_cast<PyCFunction>(IcePy_declareValue), METH_VARARGS,
+        PyDoc_STR(STRCAST("internal function")) },
+    { STRCAST("defineValue"), reinterpret_cast<PyCFunction>(IcePy_defineValue), METH_VARARGS,
+        PyDoc_STR(STRCAST("internal function")) },
     { STRCAST("defineException"), reinterpret_cast<PyCFunction>(IcePy_defineException), METH_VARARGS,
         PyDoc_STR(STRCAST("internal function")) },
     { STRCAST("stringify"), reinterpret_cast<PyCFunction>(IcePy_stringify), METH_VARARGS,
@@ -111,10 +115,10 @@ static struct PyModuleDef iceModule =
     "The Internet Communications Engine.",
     -1,
     methods,
-    NULL,
-    NULL,
-    NULL,
-    NULL
+    ICE_NULLPTR,
+    ICE_NULLPTR,
+    ICE_NULLPTR,
+    ICE_NULLPTR
 };
 
 #else

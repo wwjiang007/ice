@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -28,7 +28,7 @@ module Ice
  * with the communicator.
  *
  **/
-["delegate"]
+["delegate", "php:internal"]
 local interface ValueFactory
 {
     /**
@@ -59,6 +59,7 @@ local interface ValueFactory
  * @see ValueFactory
  *
  **/
+["php:internal"]
 local interface ValueFactoryManager
 {
     /**

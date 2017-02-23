@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -132,14 +132,17 @@ IceSSL::SSLEngine::verifyPeer(const string& address, const NativeConnectionInfoP
 {
     const CertificateVerifierPtr verifier = getCertificateVerifier();
 
-#if !defined(ICE_USE_SECURE_TRANSPORT_IOS)
+#if defined(ICE_USE_SCHANNEL) || \
+    (defined(ICE_USE_OPENSSL) && defined(OPENSSL_VERSION_NUMBER) && OPENSSL_VERSION_NUMBER < 0x10002000L)
+
     //
     // For an outgoing connection, we compare the proxy address (if any) against
     // fields in the server's certificate (if any).
     //
-    if(!info->nativeCerts.empty() && !address.empty())
+    if(_checkCertName && !info->nativeCerts.empty() && !address.empty())
     {
         const CertificatePtr cert = info->nativeCerts[0];
+
         //
         // Extract the IP addresses and the DNS names from the subject
         // alternative names.
@@ -159,89 +162,56 @@ IceSSL::SSLEngine::verifyPeer(const string& address, const NativeConnectionInfoP
             }
         }
 
-        //
-        // Compare the peer's address against the common name.
-        //
         bool certNameOK = false;
-        string dn;
         string addrLower = IceUtilInternal::toLower(address);
-        {
-            DistinguishedName d = cert->getSubjectDN();
-            dn = IceUtilInternal::toLower(string(d));
-            string cn = "cn=" + addrLower;
-            string::size_type pos = dn.find(cn);
-            if(pos != string::npos)
-            {
-                //
-                // Ensure we match the entire common name.
-                //
-                certNameOK = (pos + cn.size() == dn.size()) || (dn[pos + cn.size()] == ',');
-            }
-        }
+        bool isIpAddress = IceInternal::isIpAddress(address);
 
         //
-        // Compare the peer's address against the dnsName and ipAddress
-        // values in the subject alternative name.
+        // If address is an IP address, compare it to the subject alternative names IP adddress
         //
-        if(!certNameOK)
+        if(isIpAddress)
         {
             certNameOK = find(ipAddresses.begin(), ipAddresses.end(), addrLower) != ipAddresses.end();
         }
-        if(!certNameOK)
+        else
         {
-            certNameOK = find(dnsNames.begin(), dnsNames.end(), addrLower) != dnsNames.end();
+            //
+            // If subjectAlt is empty compare it ot the subject CN, othewise
+            // compare it to the to the subject alt name dnsNames
+            //
+            if(dnsNames.empty())
+            {
+                DistinguishedName d = cert->getSubjectDN();
+                string dn = IceUtilInternal::toLower(string(d));
+                string cn = "cn=" + addrLower;
+                string::size_type pos = dn.find(cn);
+                if(pos != string::npos)
+                {
+                    //
+                    // Ensure we match the entire common name.
+                    //
+                    certNameOK = (pos + cn.size() == dn.size()) || (dn[pos + cn.size()] == ',');
+                }
+            }
+            else
+            {
+                certNameOK = find(dnsNames.begin(), dnsNames.end(), addrLower) != dnsNames.end();
+            }
         }
 
-        //
-        // Log a message if the name comparison fails. If CheckCertName is defined,
-        // we also raise an exception to abort the connection. Don't log a message if
-        // CheckCertName is not defined and a verifier is present.
-        //
-        if(!certNameOK && (_checkCertName || (_securityTraceLevel >= 1 && !verifier)))
+        if(!certNameOK)
         {
             ostringstream ostr;
-            ostr << "IceSSL: ";
-            if(!_checkCertName)
-            {
-                ostr << "ignoring ";
-            }
-            ostr << "certificate validation failure:\npeer certificate does not have `" << address
-                    << "' as its commonName or in its subjectAltName extension";
-            if(!dn.empty())
-            {
-                ostr << "\nSubject DN: " << dn;
-            }
-            if(!dnsNames.empty())
-            {
-                ostr << "\nDNS names found in certificate: ";
-                for(vector<string>::const_iterator p = dnsNames.begin(); p != dnsNames.end(); ++p)
-                {
-                    if(p != dnsNames.begin())
-                    {
-                        ostr << ", ";
-                    }
-                    ostr << *p;
-                }
-            }
-            if(!ipAddresses.empty())
-            {
-                ostr << "\nIP addresses found in certificate: ";
-                for(vector<string>::const_iterator p = ipAddresses.begin(); p != ipAddresses.end(); ++p)
-                {
-                    if(p != ipAddresses.begin())
-                    {
-                        ostr << ", ";
-                    }
-                    ostr << *p;
-                }
-            }
+            ostr << "IceSSL: certificate validation failure: "
+                 << (isIpAddress ? "IP address mismatch" : "Hostname mismatch");
             string msg = ostr.str();
             if(_securityTraceLevel >= 1)
             {
                 Trace out(_logger, _securityTraceCategory);
                 out << msg;
             }
-            if(_checkCertName)
+
+            if(_verifyPeer > 0)
             {
                 SecurityException ex(__FILE__, __LINE__);
                 ex.reason = msg;

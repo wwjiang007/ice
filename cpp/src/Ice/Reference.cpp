@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -172,6 +172,25 @@ IceInternal::Reference::changeCompress(bool newCompress) const
     r->_compress = newCompress;
     r->_overrideCompress = true;
     return r;
+}
+
+bool
+IceInternal::Reference::getCompressOverride(bool& compress) const
+{
+    DefaultsAndOverridesPtr defaultsAndOverrides = getInstance()->defaultsAndOverrides();
+    if(defaultsAndOverrides->overrideCompress)
+    {
+        compress = defaultsAndOverrides->overrideCompressValue;
+    }
+    else if(_overrideCompress)
+    {
+        compress = _compress;
+    }
+    else
+    {
+        return false;
+    }
+    return true;
 }
 
 Int
@@ -624,7 +643,7 @@ IceInternal::FixedReference::getPreferSecure() const
 Ice::EndpointSelectionType
 IceInternal::FixedReference::getEndpointSelection() const
 {
-    return Random;
+    return ICE_ENUM(EndpointSelectionType, Random);
 }
 
 int
@@ -734,15 +753,6 @@ IceInternal::FixedReference::streamWrite(OutputStream*) const
     throw FixedProxyException(__FILE__, __LINE__);
 }
 
-string
-IceInternal::FixedReference::toString() const
-{
-    throw FixedProxyException(__FILE__, __LINE__);
-
-    assert(false);   // Cannot be reached.
-    return string(); // To keep the compiler from complaining.
-}
-
 PropertyDict
 IceInternal::FixedReference::toProperty(const string&) const
 {
@@ -800,7 +810,7 @@ IceInternal::FixedReference::getRequestHandler(const Ice::ObjectPrxPtr& proxy) c
 
     _fixedConnection->throwException(); // Throw in case our connection is already destroyed.
 
-    bool compress;
+    bool compress = false;
     if(defaultsAndOverrides->overrideCompress)
     {
         compress = defaultsAndOverrides->overrideCompressValue;
@@ -808,10 +818,6 @@ IceInternal::FixedReference::getRequestHandler(const Ice::ObjectPrxPtr& proxy) c
     else if(_overrideCompress)
     {
         compress = _compress;
-    }
-    else
-    {
-        compress = _fixedConnection->endpoint()->compress();
     }
 
     ReferencePtr ref = const_cast<FixedReference*>(this);
@@ -1256,7 +1262,7 @@ IceInternal::RoutableReference::toProperty(const string& prefix) const
     properties[prefix + ".CollocationOptimized"] = _collocationOptimized ? "1" : "0";
     properties[prefix + ".ConnectionCached"] = _cacheConnection ? "1" : "0";
     properties[prefix + ".PreferSecure"] = _preferSecure ? "1" : "0";
-    properties[prefix + ".EndpointSelection"] = _endpointSelection == Random ? "Random" : "Ordered";
+    properties[prefix + ".EndpointSelection"] = _endpointSelection == ICE_ENUM(EndpointSelectionType, Random) ? "Random" : "Ordered";
     {
         ostringstream s;
         s << _locatorCacheTimeout;
@@ -1670,7 +1676,7 @@ IceInternal::RoutableReference::getConnectionNoRouterInfo(const GetConnectionCal
     if(_locatorInfo)
     {
         RoutableReference* self = const_cast<RoutableReference*>(this);
-        _locatorInfo->getEndpointsWithCallback(self, _locatorCacheTimeout, new Callback(self, callback));
+        _locatorInfo->getEndpoints(self, _locatorCacheTimeout, new Callback(self, callback));
     }
     else
     {
@@ -1796,7 +1802,7 @@ IceInternal::RoutableReference::createConnection(const vector<EndpointIPtr>& all
             const vector<EndpointIPtr> _endpoints;
             const GetConnectionCallbackPtr _callback;
             size_t _i;
-            IceUtil::UniquePtr<Ice::LocalException> _exception;
+            IceInternal::UniquePtr<Ice::LocalException> _exception;
         };
 
         //
@@ -1910,13 +1916,13 @@ IceInternal::RoutableReference::filterEndpoints(const vector<EndpointIPtr>& allE
     //
     switch(getEndpointSelection())
     {
-        case Random:
+        case ICE_ENUM(EndpointSelectionType, Random):
         {
             RandomNumberGenerator rng;
             random_shuffle(endpoints.begin(), endpoints.end(), rng);
             break;
         }
-        case Ordered:
+        case ICE_ENUM(EndpointSelectionType, Ordered):
         {
             // Nothing to do.
             break;

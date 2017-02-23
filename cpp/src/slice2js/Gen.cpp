@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -185,7 +185,7 @@ Slice::JsVisitor::getValue(const string& scope, const TypePtr& type)
     EnumPtr en = EnumPtr::dynamicCast(type);
     if(en)
     {
-        return getReference(scope, en->scoped()) + '.' + fixId((*en->getEnumerators().begin())->name());
+        return getReference(scope, en->scoped()) + '.' + fixId((*en->enumerators().begin())->name());
     }
 
     StructPtr st = StructPtr::dynamicCast(type);
@@ -238,17 +238,9 @@ Slice::JsVisitor::writeConstantValue(const string& scope, const TypePtr& type, c
         }
         else if((ep = EnumPtr::dynamicCast(type)))
         {
-            string::size_type colon = value.rfind(':');
-            string enumerator;
-            if(colon != string::npos)
-            {
-                enumerator = fixId(value.substr(colon + 1));
-            }
-            else
-            {
-                enumerator = fixId(value);
-            }
-            os << getReference(scope, ep->scoped()) << '.' << enumerator;
+            EnumeratorPtr lte = EnumeratorPtr::dynamicCast(valueType);
+            assert(lte);
+            os << getReference(scope, ep->scoped()) << '.' << fixId(lte->name());
         }
         else
         {
@@ -463,7 +455,7 @@ Slice::Gen::printHeader()
     static const char* header =
 "// **********************************************************************\n"
 "//\n"
-"// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.\n"
+"// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.\n"
 "//\n"
 "// This copy of Ice is licensed to you under the terms described in the\n"
 "// ICE_LICENSE file included in this distribution.\n"
@@ -898,6 +890,13 @@ Slice::Gen::TypesVisitor::visitModuleEnd(const ModulePtr& p)
 bool
 Slice::Gen::TypesVisitor::visitClassDefStart(const ClassDefPtr& p)
 {
+    //
+    // Don't need to generate any code for local interfaces.
+    //
+    if(p->isInterface() && p->isLocal())
+    {
+        return false;
+    }
     const string scope = p->scope();
     const string scoped = p->scoped();
     const string localScope = getLocalScope(scope);
@@ -1121,49 +1120,60 @@ Slice::Gen::TypesVisitor::visitClassDefStart(const ClassDefPtr& p)
             _out << eb;
         }
         _out << eb << ";";
-
-        const string baseProxy =
-            !p->isInterface() && base ? (getLocalScope(base->scope()) + "." + base->name() + "Prx") : "Ice.ObjectPrx";
-
-        _out << sp;
-        _out << nl << localScope << '.' << prxName << " = class extends " << baseProxy;
-        _out << sb;
-
-
-        if(!bases.empty())
-        {
-            _out << sp;
-            _out << nl << "static get _implements()";
-            _out << sb;
-            _out << nl << "return [";
         
-            _out.inc();
-            for(ClassList::const_iterator q = bases.begin(); q != bases.end();)
+        //
+        // Generate a proxy class for interfaces or classes with operations.
+        //
+        string proxyType = "undefined";
+        if(p->isInterface() || p->allOperations().size() > 0)
+        {
+            proxyType = localScope + '.' + prxName;
+            string baseProxy = "Ice.ObjectPrx";
+            if(!p->isInterface() && base && base->allOperations().size() > 0)
             {
-                ClassDefPtr base = *q;
-                if(base->isInterface())
+                baseProxy = (getLocalScope(base->scope()) + "." + base->name() + "Prx");
+            }
+
+            _out << sp;
+            _out << nl << proxyType << " = class extends " << baseProxy;
+            _out << sb;
+
+
+            if(!bases.empty())
+            {
+                _out << sp;
+                _out << nl << "static get _implements()";
+                _out << sb;
+                _out << nl << "return [";
+            
+                _out.inc();
+                for(ClassList::const_iterator q = bases.begin(); q != bases.end();)
                 {
-                    _out << nl << getLocalScope(base->scope()) << "." << base->name() << "Prx";
-                    if(++q != bases.end())
+                    ClassDefPtr base = *q;
+                    if(base->isInterface())
                     {
-                        _out << ", ";
+                        _out << nl << getLocalScope(base->scope()) << "." << base->name() << "Prx";
+                        if(++q != bases.end())
+                        {
+                            _out << ", ";
+                        }
+                    }
+                    else
+                    {
+                        q++;
                     }
                 }
-                else
-                {
-                    q++;
-                }
+                _out.dec();
+                _out << "];";
+                _out << eb;
             }
-            _out.dec();
-            _out << "];";
-            _out << eb;
-        }
 
-        _out << eb << ";";
+            _out << eb << ";";
+        }
 
         _out << sp << nl << "Slice.defineOperations("
              << localScope << "._" << p->name() << "Disp, "
-             << localScope << '.' << prxName << ", "
+             << proxyType << ", "
              << "iceC_" << getLocalScope(scoped, "_") << "_ids, "
              << scopedPos;
 
@@ -1705,7 +1715,7 @@ Slice::Gen::TypesVisitor::visitEnum(const EnumPtr& p)
     _out.inc();
     _out << nl;
 
-    const EnumeratorList enumerators = p->getEnumerators();
+    const EnumeratorList enumerators = p->enumerators();
     int i = 0;
     for(EnumeratorList::const_iterator en = enumerators.begin(); en != enumerators.end(); ++en)
     {
@@ -1776,7 +1786,15 @@ Slice::Gen::TypesVisitor::encodeTypeForOperation(const TypePtr& type)
     ProxyPtr proxy = ProxyPtr::dynamicCast(type);
     if(proxy)
     {
-        return "\"" + fixId(proxy->_class()->scoped() + "Prx") + "\"";
+        ClassDefPtr def = proxy->_class()->definition();
+        if(def->isInterface() || def->allOperations().size() > 0)
+        {
+            return "\"" + fixId(proxy->_class()->scoped() + "Prx") + "\"";
+        }
+        else
+        {
+            return "Ice.ObjectPrx";
+        }
     }
 
     SequencePtr seq = SequencePtr::dynamicCast(type);

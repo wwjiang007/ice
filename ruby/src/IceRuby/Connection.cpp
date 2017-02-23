@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -46,14 +46,23 @@ IceRuby::createConnection(const Ice::ConnectionPtr& p)
 
 extern "C"
 VALUE
-IceRuby_Connection_close(VALUE self, VALUE b)
+IceRuby_Connection_close(VALUE self, VALUE mode)
 {
     ICE_RUBY_TRY
     {
         Ice::ConnectionPtr* p = reinterpret_cast<Ice::ConnectionPtr*>(DATA_PTR(self));
         assert(p);
 
-        (*p)->close(RTEST(b));
+        volatile VALUE type = callRuby(rb_path2class, "Ice::ConnectionClose");
+        if(callRuby(rb_obj_is_instance_of, mode, type) != Qtrue)
+        {
+            throw RubyException(rb_eTypeError,
+                "value for 'mode' argument must be an enumerator of Ice::ConnectionClose");
+        }
+        volatile VALUE modeValue = callRuby(rb_funcall, mode, rb_intern("to_i"), 0);
+        assert(TYPE(modeValue) == T_FIXNUM);
+        Ice::ConnectionClose cc = static_cast<Ice::ConnectionClose>(FIX2LONG(modeValue));
+        (*p)->close(cc);
     }
     ICE_RUBY_CATCH
     return Qnil;
@@ -61,14 +70,38 @@ IceRuby_Connection_close(VALUE self, VALUE b)
 
 extern "C"
 VALUE
-IceRuby_Connection_flushBatchRequests(VALUE self)
+IceRuby_Connection_flushBatchRequests(VALUE self, VALUE compress)
 {
     ICE_RUBY_TRY
     {
         Ice::ConnectionPtr* p = reinterpret_cast<Ice::ConnectionPtr*>(DATA_PTR(self));
         assert(p);
 
-        (*p)->flushBatchRequests();
+        volatile VALUE type = callRuby(rb_path2class, "Ice::CompressBatch");
+        if(callRuby(rb_obj_is_instance_of, compress, type) != Qtrue)
+        {
+            throw RubyException(rb_eTypeError,
+                "value for 'compress' argument must be an enumerator of Ice::CompressBatch");
+        }
+        volatile VALUE compressValue = callRuby(rb_funcall, compress, rb_intern("to_i"), 0);
+        assert(TYPE(compressValue) == T_FIXNUM);
+        Ice::CompressBatch cb = static_cast<Ice::CompressBatch>(FIX2LONG(compressValue));
+        (*p)->flushBatchRequests(cb);
+    }
+    ICE_RUBY_CATCH
+    return Qnil;
+}
+
+extern "C"
+VALUE
+IceRuby_Connection_heartbeat(VALUE self)
+{
+    ICE_RUBY_TRY
+    {
+        Ice::ConnectionPtr* p = reinterpret_cast<Ice::ConnectionPtr*>(DATA_PTR(self));
+        assert(p);
+
+        (*p)->heartbeat();
     }
     ICE_RUBY_CATCH
     return Qnil;
@@ -221,6 +254,7 @@ IceRuby_Connection_getEndpoint(VALUE self)
     ICE_RUBY_CATCH
     return Qnil;
 }
+
 extern "C"
 VALUE
 IceRuby_Connection_setBufferSize(VALUE self, VALUE r, VALUE s)
@@ -234,6 +268,21 @@ IceRuby_Connection_setBufferSize(VALUE self, VALUE r, VALUE s)
         int sndSize = static_cast<int>(getInteger(s));
 
         (*p)->setBufferSize(rcvSize, sndSize);
+    }
+    ICE_RUBY_CATCH
+    return Qnil;
+}
+
+extern "C"
+VALUE
+IceRuby_Connection_throwException(VALUE self)
+{
+    ICE_RUBY_TRY
+    {
+        Ice::ConnectionPtr* p = reinterpret_cast<Ice::ConnectionPtr*>(DATA_PTR(self));
+        assert(p);
+
+        (*p)->throwException();
     }
     ICE_RUBY_CATCH
     return Qnil;
@@ -376,7 +425,8 @@ IceRuby::initConnection(VALUE iceModule)
     // Instance methods.
     //
     rb_define_method(_connectionClass, "close", CAST_METHOD(IceRuby_Connection_close), 1);
-    rb_define_method(_connectionClass, "flushBatchRequests", CAST_METHOD(IceRuby_Connection_flushBatchRequests), 0);
+    rb_define_method(_connectionClass, "flushBatchRequests", CAST_METHOD(IceRuby_Connection_flushBatchRequests), 1);
+    rb_define_method(_connectionClass, "heartbeat", CAST_METHOD(IceRuby_Connection_heartbeat), 0);
     rb_define_method(_connectionClass, "setACM", CAST_METHOD(IceRuby_Connection_setACM), 3);
     rb_define_method(_connectionClass, "getACM", CAST_METHOD(IceRuby_Connection_getACM), 0);
     rb_define_method(_connectionClass, "type", CAST_METHOD(IceRuby_Connection_type), 0);
@@ -384,6 +434,7 @@ IceRuby::initConnection(VALUE iceModule)
     rb_define_method(_connectionClass, "getInfo", CAST_METHOD(IceRuby_Connection_getInfo), 0);
     rb_define_method(_connectionClass, "getEndpoint", CAST_METHOD(IceRuby_Connection_getEndpoint), 0);
     rb_define_method(_connectionClass, "setBufferSize", CAST_METHOD(IceRuby_Connection_setBufferSize), 2);
+    rb_define_method(_connectionClass, "throwException", CAST_METHOD(IceRuby_Connection_throwException), 0);
     rb_define_method(_connectionClass, "toString", CAST_METHOD(IceRuby_Connection_toString), 0);
     rb_define_method(_connectionClass, "to_s", CAST_METHOD(IceRuby_Connection_toString), 0);
     rb_define_method(_connectionClass, "inspect", CAST_METHOD(IceRuby_Connection_toString), 0);

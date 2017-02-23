@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -43,8 +43,9 @@ public:
 
     EI();
 
-    virtual bool checkValues(const Ice::Current&);
+    bool checkValues();
 };
+ICE_DEFINE_PTR(EIPtr, EI);
 
 class FI : public Test::F
 {
@@ -53,8 +54,9 @@ public:
     FI();
     FI(const Test::EPtr&);
 
-    virtual bool checkValues(const Ice::Current&);
+    bool checkValues();
 };
+ICE_DEFINE_PTR(FIPtr, FI);
 
 #ifdef ICE_CPP11_MAPPING
 class II : public ::Ice::InterfaceByValue<Test::I>
@@ -78,12 +80,7 @@ class HI : public Test::H
 {
 };
 
-class InitialI :
-#ifdef ICE_CPP11_MAPPING
-    public Test::InitialDisp
-#else
-    public Test::Initial
-#endif
+class InitialI : public Test::Initial
 {
 public:
 

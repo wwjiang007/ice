@@ -1,18 +1,15 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
 //
 // **********************************************************************
 
-using System;
-using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Threading;
-using Ice.Instrumentation;
 
 namespace IceInternal
 {
@@ -202,7 +199,7 @@ namespace IceInternal
             {
                 while(_flushing && _exception == null)
                 {
-                    System.Threading.Monitor.Wait(this);
+                    Monitor.Wait(this);
                 }
 
                 if(_exception != null)

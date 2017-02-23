@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -136,6 +136,12 @@ public class AllTests
                 // but not always. See bug 3179.
                 //
             }
+            catch(Ice.ConnectTimeoutException ex)
+            {
+                //
+                // On Windows, we set Ice.Override.ConnectTimeout to speed up testing.
+                //
+            }
         }
         out.println("ok");
 
@@ -170,7 +176,7 @@ public class AllTests
                 test(test2.ice_getConnection() == test3.ice_getConnection());
 
                 names.remove(test1.getAdapterName());
-                test1.ice_getConnection().close(false);
+                test1.ice_getConnection().close(Ice.ConnectionClose.GracefullyWithWait);
             }
 
             //
@@ -192,7 +198,7 @@ public class AllTests
 
                 for(RemoteObjectAdapterPrx p : adapters)
                 {
-                    p.getTestIntf().ice_getConnection().close(false);
+                    p.getTestIntf().ice_getConnection().close(Ice.ConnectionClose.GracefullyWithWait);
                 }
             }
 
@@ -218,7 +224,7 @@ public class AllTests
                 test(test2.ice_getConnection() == test3.ice_getConnection());
 
                 names.remove(test1.getAdapterName());
-                test1.ice_getConnection().close(false);
+                test1.ice_getConnection().close(Ice.ConnectionClose.GracefullyWithWait);
             }
 
             //
@@ -252,11 +258,11 @@ public class AllTests
             int count;
             if(shortenTest)
             {
-                count = 60;
+                count = 20;
             }
             else
             {
-                count = 20;
+                count = 60;
             }
 
             int adapterCount = adapters.length;
@@ -265,7 +271,7 @@ public class AllTests
                 TestIntfPrx[] proxies;
                 if(shortenTest)
                 {
-                    if(count == 10)
+                    if(count == 1)
                     {
                         com.deactivateObjectAdapter(adapters[4]);
                         --adapterCount;
@@ -326,7 +332,7 @@ public class AllTests
                 {
                     try
                     {
-                        a.getTestIntf().ice_getConnection().close(false);
+                        a.getTestIntf().ice_getConnection().close(Ice.ConnectionClose.GracefullyWithWait);
                     }
                     catch(Ice.LocalException ex)
                     {
@@ -368,7 +374,7 @@ public class AllTests
                 test(test2.ice_getConnection() == test3.ice_getConnection());
 
                 names.remove(getAdapterNameWithAMI(test1));
-                test1.ice_getConnection().close(false);
+                test1.ice_getConnection().close(Ice.ConnectionClose.GracefullyWithWait);
             }
 
             //
@@ -390,7 +396,7 @@ public class AllTests
 
                 for(RemoteObjectAdapterPrx p : adapters)
                 {
-                    p.getTestIntf().ice_getConnection().close(false);
+                    p.getTestIntf().ice_getConnection().close(Ice.ConnectionClose.GracefullyWithWait);
                 }
             }
 
@@ -416,7 +422,7 @@ public class AllTests
                 test(test2.ice_getConnection() == test3.ice_getConnection());
 
                 names.remove(getAdapterNameWithAMI(test1));
-                test1.ice_getConnection().close(false);
+                test1.ice_getConnection().close(Ice.ConnectionClose.GracefullyWithWait);
             }
 
             //
@@ -449,7 +455,7 @@ public class AllTests
             while(!names.isEmpty())
             {
                 names.remove(test.getAdapterName());
-                test.ice_getConnection().close(false);
+                test.ice_getConnection().close(Ice.ConnectionClose.GracefullyWithWait);
             }
 
             test = TestIntfPrxHelper.uncheckedCast(test.ice_endpointSelection(Ice.EndpointSelectionType.Random));
@@ -461,7 +467,7 @@ public class AllTests
             while(!names.isEmpty())
             {
                 names.remove(test.getAdapterName());
-                test.ice_getConnection().close(false);
+                test.ice_getConnection().close(Ice.ConnectionClose.GracefullyWithWait);
             }
 
             deactivate(com, adapters);
@@ -507,6 +513,12 @@ public class AllTests
                 // but not always. See bug 3179.
                 //
             }
+            catch(Ice.ConnectTimeoutException ex)
+            {
+                //
+                // On Windows, we set Ice.Override.ConnectTimeout to speed up testing.
+                //
+            }
 
             Ice.Endpoint[] endpoints = test.ice_getEndpoints();
 
@@ -519,11 +531,11 @@ public class AllTests
             adapters.add(com.createObjectAdapter("Adapter36", endpoints[2].toString()));
             for(i = 0; i < nRetry && test.getAdapterName().equals("Adapter36"); i++);
             test(i == nRetry);
-            test.ice_getConnection().close(false);
+            test.ice_getConnection().close(Ice.ConnectionClose.GracefullyWithWait);
             adapters.add(com.createObjectAdapter("Adapter35", endpoints[1].toString()));
             for(i = 0; i < nRetry && test.getAdapterName().equals("Adapter35"); i++);
             test(i == nRetry);
-            test.ice_getConnection().close(false);
+            test.ice_getConnection().close(Ice.ConnectionClose.GracefullyWithWait);
             adapters.add(com.createObjectAdapter("Adapter34", endpoints[0].toString()));
             for(i = 0; i < nRetry && test.getAdapterName().equals("Adapter34"); i++);
             test(i == nRetry);
@@ -559,6 +571,12 @@ public class AllTests
                 //
                 // Usually the actual type of this exception is ConnectionRefusedException,
                 // but not always. See bug 3179.
+                //
+            }
+            catch(Ice.ConnectTimeoutException ex)
+            {
+                //
+                // On Windows, we set Ice.Override.ConnectTimeout to speed up testing.
                 //
             }
         }
@@ -679,6 +697,12 @@ public class AllTests
                 // but not always. See bug 3179.
                 //
             }
+            catch(Ice.ConnectTimeoutException ex)
+            {
+                //
+                // On Windows, we set Ice.Override.ConnectTimeout to speed up testing.
+                //
+            }
 
             Ice.Endpoint[] endpoints = test.ice_getEndpoints();
 
@@ -743,6 +767,12 @@ public class AllTests
                 // but not always. See bug 3179.
                 //
             }
+            catch(Ice.ConnectTimeoutException ex)
+            {
+                //
+                // On Windows, we set Ice.Override.ConnectTimeout to speed up testing.
+                //
+            }
 
             Ice.Endpoint[] endpoints = test.ice_getEndpoints();
 
@@ -802,7 +832,7 @@ public class AllTests
                 for(i = 0; i < 5; i++)
                 {
                     test(test.getAdapterName().equals("Adapter82"));
-                    test.ice_getConnection().close(false);
+                    test.ice_getConnection().close(Ice.ConnectionClose.GracefullyWithWait);
                 }
 
                 TestIntfPrx testSecure = TestIntfPrxHelper.uncheckedCast(test.ice_secure(true));
@@ -818,7 +848,7 @@ public class AllTests
                 for(i = 0; i < 5; i++)
                 {
                     test(test.getAdapterName().equals("Adapter81"));
-                    test.ice_getConnection().close(false);
+                    test.ice_getConnection().close(Ice.ConnectionClose.GracefullyWithWait);
                 }
 
                 com.createObjectAdapter("Adapter83", (test.ice_getEndpoints()[1]).toString()); // Reactive tcp OA.
@@ -826,7 +856,7 @@ public class AllTests
                 for(i = 0; i < 5; i++)
                 {
                     test(test.getAdapterName().equals("Adapter83"));
-                    test.ice_getConnection().close(false);
+                    test.ice_getConnection().close(Ice.ConnectionClose.GracefullyWithWait);
                 }
 
                 com.deactivateObjectAdapter(adapters.get(0));
@@ -840,6 +870,12 @@ public class AllTests
                     //
                     // Usually the actual type of this exception is ConnectionRefusedException,
                     // but not always. See bug 3179.
+                    //
+                }
+                catch(Ice.ConnectTimeoutException ex)
+                {
+                    //
+                    // On Windows, we set Ice.Override.ConnectTimeout to speed up testing.
                     //
                 }
 
@@ -974,6 +1010,74 @@ public class AllTests
                     clientCommunicator.destroy();
                 }
                 serverCommunicator.destroy();
+            }
+
+            out.println("ok");
+        }
+
+        //
+        // On Windows, the FD limit is very high and there's no way to limit the number of FDs
+        // for the server so we don't run this test.
+        //
+        if(!System.getProperty("os.name").startsWith("Windows"))
+        {
+            out.print("testing FD limit... ");
+            out.flush();
+
+            RemoteObjectAdapterPrx adapter = com.createObjectAdapter("Adapter", "default");
+
+            TestIntfPrx test = adapter.getTestIntf();
+            int i = 0;
+            while(true)
+            {
+                try
+                {
+                    test.ice_connectionId(Integer.toString(i)).ice_ping();
+                    ++i;
+                }
+                catch(Ice.LocalException ex)
+                {
+                    break;
+                }
+            }
+
+            try
+            {
+                test.ice_connectionId(Integer.toString(i)).ice_ping();
+                test(false);
+            }
+            catch(Ice.ConnectionRefusedException ex)
+            {
+                // Close the connection now to free a FD (it could be done after the sleep but
+                // there could be race condiutation since the connection might not be closed
+                // immediately due to threading).
+                test.ice_connectionId("0").ice_getConnection().close(Ice.ConnectionClose.GracefullyWithWait);
+
+                //
+                // The server closed the acceptor, wait one second and retry after freeing a FD.
+                //
+                try
+                {
+                    Thread.sleep(1100);
+                }
+                catch(InterruptedException ex1)
+                {
+                }
+
+                try
+                {
+                    test.ice_connectionId(Integer.toString(i)).ice_ping();
+                }
+                catch(Ice.LocalException ex1)
+                {
+                    test(false);
+                }
+            }
+            catch(Ice.LocalException ex)
+            {
+                // The server didn't close the acceptor but we still get a failure (it's possible
+                // that the client reached the FD limit depending on the server we are running
+                // against...).
             }
 
             out.println("ok");

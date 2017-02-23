@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -120,7 +120,7 @@ protected:
     exception_ptr _exception;
 #else
     const Ice::AMD_Object_ice_invokePtr _amdCB;
-    IceUtil::UniquePtr<Ice::Exception> _exception;
+    IceInternal::UniquePtr<Ice::Exception> _exception;
 #endif
 
     Ice::LocatorPrxPtr _locatorPrx;

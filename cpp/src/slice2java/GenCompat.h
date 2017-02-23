@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -64,9 +64,10 @@ protected:
                                      const OperationPtr&, int&, bool, bool, bool, const std::string& = "", bool = false);
 
     //
-    // Generate a throws clause containing only non-local exceptions.
+    // Generate a throws clause containing only checked exceptions.
+    // op is provided only when we want to check for the java:UserException metadata
     //
-    void writeThrowsClause(const std::string&, const ExceptionList&);
+    void writeThrowsClause(const std::string&, const ExceptionList&, const OperationPtr& op = 0);
 
     //
     // Generate code to compute a hash code for a type.

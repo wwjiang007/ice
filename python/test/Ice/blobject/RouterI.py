@@ -1,6 +1,6 @@
 # **********************************************************************
 #
-# Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+# Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 #
 # This copy of Ice is licensed to you under the terms described in the
 # ICE_LICENSE file included in this distribution.
@@ -131,7 +131,7 @@ class ServantLocatorI(Ice.ServantLocator):
     def deactivate(self, s):
         pass
 
-class RouterI(Ice.Router):
+class RouterI(Ice._RouterDisp):
     def __init__(self, communicator, sync):
         self._adapter = communicator.createObjectAdapterWithEndpoints("forward", "default -h 127.0.0.1")
         if sync:

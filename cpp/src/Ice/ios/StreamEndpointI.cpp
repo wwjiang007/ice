@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -49,7 +49,7 @@ namespace
 inline CFStringRef
 toCFString(const string& s)
 {
-    return CFStringCreateWithCString(NULL, s.c_str(), kCFStringEncodingUTF8);
+    return CFStringCreateWithCString(ICE_NULLPTR, s.c_str(), kCFStringEncodingUTF8);
 }
 
 }
@@ -71,29 +71,23 @@ IceObjC::Instance::Instance(const Ice::CommunicatorPtr& com, Short type, const s
 #if TARGET_IPHONE_SIMULATOR != 0
         throw Ice::FeatureNotSupportedException(__FILE__, __LINE__, "SOCKS proxy not supported");
 #endif
-        _proxySettings = CFDictionaryCreateMutable(0, 3, &kCFTypeDictionaryKeyCallBacks,
-                                                   &kCFTypeDictionaryValueCallBacks);
+        _proxySettings.reset(CFDictionaryCreateMutable(0, 3, &kCFTypeDictionaryKeyCallBacks,
+                                                       &kCFTypeDictionaryValueCallBacks));
 
         _proxyPort = properties->getPropertyAsIntWithDefault("Ice.SOCKSProxyPort", 1080);
 
-        CFStringRef host = toCFString(_proxyHost);
-        CFDictionarySetValue(_proxySettings, kCFStreamPropertySOCKSProxyHost, host);
-        CFRelease(host);
+        UniqueRef<CFStringRef> host(toCFString(_proxyHost));
+        CFDictionarySetValue(_proxySettings.get(), kCFStreamPropertySOCKSProxyHost, host.get());
 
-        CFNumberRef port = CFNumberCreate(0, kCFNumberSInt32Type, &_proxyPort);
-        CFDictionarySetValue(_proxySettings, kCFStreamPropertySOCKSProxyPort, port);
-        CFRelease(port);
+        UniqueRef<CFNumberRef> port(CFNumberCreate(0, kCFNumberSInt32Type, &_proxyPort));
+        CFDictionarySetValue(_proxySettings.get(), kCFStreamPropertySOCKSProxyPort, port.get());
 
-        CFDictionarySetValue(_proxySettings, kCFStreamPropertySOCKSVersion, kCFStreamSocketSOCKSVersion4);
+        CFDictionarySetValue(_proxySettings.get(), kCFStreamPropertySOCKSVersion, kCFStreamSocketSOCKSVersion4);
     }
 }
 
 IceObjC::Instance::~Instance()
 {
-    if(_proxySettings)
-    {
-        CFRelease(_proxySettings);
-    }
 }
 
 void
@@ -115,8 +109,8 @@ IceObjC::Instance::setupStreams(CFReadStreamRef readStream,
 
     if(!server && _proxySettings)
     {
-        if(!CFReadStreamSetProperty(readStream, kCFStreamPropertySOCKSProxy, _proxySettings) ||
-           !CFWriteStreamSetProperty(writeStream, kCFStreamPropertySOCKSProxy, _proxySettings))
+        if(!CFReadStreamSetProperty(readStream, kCFStreamPropertySOCKSProxy, _proxySettings.get()) ||
+           !CFWriteStreamSetProperty(writeStream, kCFStreamPropertySOCKSProxy, _proxySettings.get()))
         {
             throw Ice::SyscallException(__FILE__, __LINE__);
         }

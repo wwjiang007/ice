@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -313,7 +313,7 @@ public class AllTests
         {
             if(proxy.ice_getCachedConnection() != null)
             {
-                proxy.ice_getCachedConnection().close(false);
+                proxy.ice_getCachedConnection().close(Ice.ConnectionClose.GracefullyWithWait);
             }
 
             try
@@ -326,7 +326,7 @@ public class AllTests
 
             if(proxy.ice_getCachedConnection() != null)
             {
-                proxy.ice_getCachedConnection().close(false);
+                proxy.ice_getCachedConnection().close(Ice.ConnectionClose.GracefullyWithWait);
             }
         }
 
@@ -545,8 +545,8 @@ public class AllTests
 
         if(!collocated)
         {
-            metrics.ice_getConnection().close(false);
-            metrics.ice_connectionId("Con1").ice_getConnection().close(false);
+            metrics.ice_getConnection().close(Ice.ConnectionClose.GracefullyWithWait);
+            metrics.ice_connectionId("Con1").ice_getConnection().close(Ice.ConnectionClose.GracefullyWithWait);
 
             waitForCurrent(clientMetrics, "View", "Connection", 0);
             waitForCurrent(serverMetrics, "View", "Connection", 0);
@@ -649,7 +649,7 @@ public class AllTests
             map = toMap(serverMetrics.getMetricsView("View", timestamp).get("Connection"));
             test(map.get("holding").current == 1);
 
-            metrics.ice_getConnection().close(false);
+            metrics.ice_getConnection().close(Ice.ConnectionClose.GracefullyWithWait);
 
             map = toMap(clientMetrics.getMetricsView("View", timestamp).get("Connection"));
             test(map.get("closing").current == 1);
@@ -664,7 +664,7 @@ public class AllTests
             props.put("IceMX.Metrics.View.Map.Connection.GroupBy", "none");
             updateProps(clientProps, serverProps, update, props, "Connection");
 
-            metrics.ice_getConnection().close(false);
+            metrics.ice_getConnection().close(Ice.ConnectionClose.GracefullyWithWait);
 
             metrics.ice_timeout(500).ice_ping();
             controller.hold();
@@ -726,7 +726,7 @@ public class AllTests
             testAttribute(clientMetrics, clientProps, update, "Connection", "mcastHost", "", out);
             testAttribute(clientMetrics, clientProps, update, "Connection", "mcastPort", "", out);
 
-            m.ice_getConnection().close(false);
+            m.ice_getConnection().close(Ice.ConnectionClose.GracefullyWithWait);
 
             waitForCurrent(clientMetrics, "View", "Connection", 0);
             waitForCurrent(serverMetrics, "View", "Connection", 0);
@@ -746,7 +746,7 @@ public class AllTests
             IceMX.Metrics m1 = clientMetrics.getMetricsView("View", timestamp).get("ConnectionEstablishment")[0];
             test(m1.current == 0 && m1.total == 1 && m1.id.equals(hostAndPort));
 
-            metrics.ice_getConnection().close(false);
+            metrics.ice_getConnection().close(Ice.ConnectionClose.GracefullyWithWait);
             controller.hold();
             try
             {
@@ -806,7 +806,7 @@ public class AllTests
             m1 = clientMetrics.getMetricsView("View", timestamp).get("EndpointLookup")[0];
             test(m1.current <= 1 && m1.total == 1 && m1.id.equals(prx.ice_getConnection().getEndpoint().toString()));
 
-            prx.ice_getConnection().close(false);
+            prx.ice_getConnection().close(Ice.ConnectionClose.GracefullyWithWait);
 
             boolean dnsException = false;
             try
@@ -906,7 +906,7 @@ public class AllTests
             }
         }
         map = toMap(serverMetrics.getMetricsView("View", timestamp).get("Dispatch"));
-        test(map.size() == (!collocated ? 6 : 5));
+        test(map.size() == (collocated ? 5 : 6));
 
         IceMX.DispatchMetrics dm1 = (IceMX.DispatchMetrics)map.get("op");
         test(dm1.current <= 1 && dm1.total == 1 && dm1.failures == 0 && dm1.userException == 0);
@@ -1089,45 +1089,45 @@ public class AllTests
         }
 
         map = toMap(clientMetrics.getMetricsView("View", timestamp).get("Invocation"));
-        test(map.size() == (!collocated ? 6 : 5));
+        test(map.size() == (collocated ? 5 : 6));
 
         IceMX.InvocationMetrics im1;
         IceMX.ChildInvocationMetrics rim1;
         im1 = (IceMX.InvocationMetrics)map.get("op");
         test(im1.current <= 1 && im1.total == 3 && im1.failures == 0 && im1.retry == 0);
-        test(!collocated ? im1.remotes.length == 1 : im1.collocated.length == 1);
-        rim1 = (IceMX.ChildInvocationMetrics)(!collocated ? im1.remotes[0] : im1.collocated[0]);
+        test(collocated ? im1.collocated.length == 1 : im1.remotes.length == 1);
+        rim1 = (IceMX.ChildInvocationMetrics)(collocated ? im1.collocated[0] : im1.remotes[0]);
         test(rim1.current == 0 && rim1.total == 3 && rim1.failures == 0);
         test(rim1.size == 63 && rim1.replySize == 21);
 
         im1 = (IceMX.InvocationMetrics)map.get("opWithUserException");
         test(im1.current == 0 && im1.total == 3 && im1.failures == 0 && im1.retry == 0);
-        test(!collocated ? im1.remotes.length == 1 : im1.collocated.length == 1);
-        rim1 = (IceMX.ChildInvocationMetrics)(!collocated ? im1.remotes[0] : im1.collocated[0]);
+        test(collocated ? im1.collocated.length == 1 : im1.remotes.length == 1);
+        rim1 = (IceMX.ChildInvocationMetrics)(collocated ? im1.collocated[0] : im1.remotes[0]);
         test(rim1.current == 0 && rim1.total == 3 && rim1.failures == 0);
         test(rim1.size == 114 && rim1.replySize == 69);
         test(im1.userException == 3);
 
         im1 = (IceMX.InvocationMetrics)map.get("opWithLocalException");
         test(im1.current <= 1 && im1.total == 3 && im1.failures == 3 && im1.retry == 0);
-        test(!collocated ? im1.remotes.length == 1 : im1.collocated.length == 1);
-        rim1 = (IceMX.ChildInvocationMetrics)(!collocated ? im1.remotes[0] : im1.collocated[0]);
+        test(collocated ? im1.collocated.length == 1 : im1.remotes.length == 1);
+        rim1 = (IceMX.ChildInvocationMetrics)(collocated ? im1.collocated[0] : im1.remotes[0]);
         test(rim1.current == 0 && rim1.total == 3 && rim1.failures == 0);
         test(rim1.size == 117 && rim1.replySize > 7);
         checkFailure(clientMetrics, "Invocation", im1.id, "::Ice::UnknownLocalException", 3, out);
 
         im1 = (IceMX.InvocationMetrics)map.get("opWithRequestFailedException");
         test(im1.current <= 1 && im1.total == 3 && im1.failures == 3 && im1.retry == 0);
-        test(!collocated ? im1.remotes.length == 1 : im1.collocated.length == 1);
-        rim1 = (IceMX.ChildInvocationMetrics)(!collocated ? im1.remotes[0] : im1.collocated[0]);
+        test(collocated ? im1.collocated.length == 1 : im1.remotes.length == 1);
+        rim1 = (IceMX.ChildInvocationMetrics)(collocated ? im1.collocated[0] : im1.remotes[0]);
         test(rim1.current == 0 && rim1.total == 3 && rim1.failures == 0);
         test(rim1.size == 141 && rim1.replySize == 120);
         checkFailure(clientMetrics, "Invocation", im1.id, "::Ice::ObjectNotExistException", 3, out);
 
         im1 = (IceMX.InvocationMetrics)map.get("opWithUnknownException");
         test(im1.current <= 1 && im1.total == 3 && im1.failures == 3 && im1.retry == 0);
-        test(!collocated ? im1.remotes.length == 1 : im1.collocated.length == 1);
-        rim1 = (IceMX.ChildInvocationMetrics)(!collocated ? im1.remotes[0] : im1.collocated[0]);
+        test(collocated ? im1.collocated.length == 1 : im1.remotes.length == 1);
+        rim1 = (IceMX.ChildInvocationMetrics)(collocated ? im1.collocated[0] : im1.remotes[0]);
         test(rim1.current == 0 && rim1.total == 3 && rim1.failures == 0);
         test(rim1.size == 123 && rim1.replySize > 7);
         checkFailure(clientMetrics, "Invocation", im1.id, "::Ice::UnknownException", 3, out);
@@ -1178,8 +1178,8 @@ public class AllTests
 
         im1 = (IceMX.InvocationMetrics)map.get("op");
         test(im1.current <= 1 && im1.total == 3 && im1.failures == 0 && im1.retry == 0);
-        test(!collocated ? (im1.remotes.length == 1) : (im1.collocated.length == 1));
-        rim1 = (IceMX.ChildInvocationMetrics)(!collocated ? im1.remotes[0] : im1.collocated[0]);
+        test(collocated ? (im1.collocated.length == 1) : (im1.remotes.length == 1));
+        rim1 = (IceMX.ChildInvocationMetrics)(collocated ? im1.collocated[0] : im1.remotes[0]);
         test(rim1.current <= 1 && rim1.total == 3 && rim1.failures == 0);
         test(rim1.size == 63 && rim1.replySize == 0);
 

@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -329,7 +329,7 @@ public class AllTests
             TimeoutPrx to = TimeoutPrxHelper.checkedCast(obj.ice_timeout(100 * mult));
             Ice.Connection connection = to.ice_getConnection();
             timeout.holdAdapter(500);
-            connection.close(false);
+            connection.close(Ice.ConnectionClose.GracefullyWithWait);
             try
             {
                 connection.getInfo(); // getInfo() doesn't throw in the closing state.
@@ -350,9 +350,10 @@ public class AllTests
                 connection.getInfo();
                 test(false);
             }
-            catch(Ice.CloseConnectionException ex)
+            catch(Ice.ConnectionManuallyClosedException ex)
             {
                 // Expected.
+                test(ex.graceful);
             }
             timeout.op(); // Ensure adapter is active.
         }
@@ -499,6 +500,16 @@ public class AllTests
             }
             catch(Ice.InvocationTimeoutException ex)
             {
+            }
+
+            try
+            {
+                ((TimeoutPrx)timeout.ice_invocationTimeout(-2)).ice_ping();
+                ((TimeoutPrx)timeout.ice_invocationTimeout(-2)).begin_ice_ping().waitForCompleted();
+            }
+            catch(Ice.Exception ex)
+            {
+                test(false);
             }
 
             ((TimeoutPrx)proxy.ice_invocationTimeout(-1)).ice_ping();

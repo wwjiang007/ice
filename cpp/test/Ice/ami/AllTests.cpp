@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -772,6 +772,21 @@ private:
     IceUtil::ThreadControl _thread;
 };
 typedef IceUtil::Handle<FlushExCallback> FlushExCallbackPtr;
+
+class CloseCallback : virtual public CallbackBase, virtual public Ice::CloseCallback
+{
+public:
+
+    CloseCallback()
+    {
+    }
+
+    virtual void closed(const Ice::ConnectionPtr& con)
+    {
+        called();
+    }
+};
+typedef IceUtil::Handle<CloseCallback> CloseCallbackPtr;
 
 class Thrower : public CallbackBase
 {
@@ -1850,7 +1865,7 @@ allTests(const Ice::CommunicatorPtr& communicator, bool collocated)
             test(p->opBatchCount() == 0);
             auto b1 = p->ice_batchOneway();
             b1->opBatch();
-            b1->ice_getConnection()->close(false);
+            b1->ice_getConnection()->close(Ice::ICE_SCOPED_ENUM(ConnectionClose, GracefullyWithWait));
 
             auto id = this_thread::get_id();
             promise<void> promise;
@@ -1886,6 +1901,7 @@ allTests(const Ice::CommunicatorPtr& communicator, bool collocated)
                 promise<void> promise;
 
                 b1->ice_getConnection()->flushBatchRequestsAsync(
+                    Ice::CompressBatch::BasedOnProxy,
                     [&](const exception_ptr& ex)
                     {
                         promise.set_exception(ex);
@@ -1905,6 +1921,7 @@ allTests(const Ice::CommunicatorPtr& communicator, bool collocated)
                 auto id = this_thread::get_id();
                 promise<void> promise;
                 p->ice_getConnection()->flushBatchRequestsAsync(
+                    Ice::CompressBatch::BasedOnProxy,
                     [&](const exception_ptr& ex)
                     {
                         promise.set_exception(ex);
@@ -1924,10 +1941,11 @@ allTests(const Ice::CommunicatorPtr& communicator, bool collocated)
                 auto b1 = Ice::uncheckedCast<Test::TestIntfPrx>(
                     p->ice_getConnection()->createProxy(p->ice_getIdentity())->ice_batchOneway());
                 b1->opBatch();
-                b1->ice_getConnection()->close(false);
+                b1->ice_getConnection()->close(Ice::ICE_SCOPED_ENUM(ConnectionClose, GracefullyWithWait));
 
                 promise<void> promise;
                 b1->ice_getConnection()->flushBatchRequestsAsync(
+                    Ice::CompressBatch::BasedOnProxy,
                     [&](exception_ptr ex)
                     {
                         promise.set_exception(move(ex));
@@ -1962,7 +1980,7 @@ allTests(const Ice::CommunicatorPtr& communicator, bool collocated)
                 b1->opBatch();
                 b1->opBatch();
 
-                communicator->flushBatchRequestsAsync().get();
+                communicator->flushBatchRequestsAsync(Ice::CompressBatch::BasedOnProxy).get();
                 test(p->waitForBatch(2));
             }
 
@@ -1979,6 +1997,7 @@ allTests(const Ice::CommunicatorPtr& communicator, bool collocated)
                 promise<void> promise;
                 auto id = this_thread::get_id();
                 communicator->flushBatchRequestsAsync(
+                    Ice::CompressBatch::BasedOnProxy,
                     [&](exception_ptr ex)
                     {
                         promise.set_exception(move(ex));
@@ -2002,11 +2021,12 @@ allTests(const Ice::CommunicatorPtr& communicator, bool collocated)
                 auto b1 = Ice::uncheckedCast<Test::TestIntfPrx>(
                     p->ice_getConnection()->createProxy(p->ice_getIdentity())->ice_batchOneway());
                 b1->opBatch();
-                b1->ice_getConnection()->close(false);
+                b1->ice_getConnection()->close(Ice::ICE_SCOPED_ENUM(ConnectionClose, GracefullyWithWait));
 
                 promise<void> promise;
                 auto id = this_thread::get_id();
                 communicator->flushBatchRequestsAsync(
+                    Ice::CompressBatch::BasedOnProxy,
                     [&](exception_ptr ex)
                     {
                         promise.set_exception(move(ex));
@@ -2041,6 +2061,7 @@ allTests(const Ice::CommunicatorPtr& communicator, bool collocated)
                 promise<void> promise;
                 auto id = this_thread::get_id();
                 communicator->flushBatchRequestsAsync(
+                    Ice::CompressBatch::BasedOnProxy,
                     [&](exception_ptr ex)
                     {
                         promise.set_exception(move(ex));
@@ -2072,12 +2093,13 @@ allTests(const Ice::CommunicatorPtr& communicator, bool collocated)
                 b2->ice_getConnection(); // Ensure connection is established.
                 b1->opBatch();
                 b2->opBatch();
-                b1->ice_getConnection()->close(false);
-                b2->ice_getConnection()->close(false);
+                b1->ice_getConnection()->close(Ice::ICE_SCOPED_ENUM(ConnectionClose, GracefullyWithWait));
+                b2->ice_getConnection()->close(Ice::ICE_SCOPED_ENUM(ConnectionClose, GracefullyWithWait));
 
                 promise<void> promise;
                 auto id = this_thread::get_id();
                 communicator->flushBatchRequestsAsync(
+                    Ice::CompressBatch::BasedOnProxy,
                     [&](exception_ptr ex)
                     {
                         promise.set_exception(move(ex));
@@ -2159,10 +2181,36 @@ allTests(const Ice::CommunicatorPtr& communicator, bool collocated)
         }
         cout << "ok" << endl;
 
-        if(p->ice_getConnection() && protocol != "bt")
+        if(p->ice_getConnection() && protocol != "bt" && p->supportsAMD())
         {
-            cout << "testing close connection with sending queue... " << flush;
+            cout << "testing graceful close connection with wait... " << flush;
             {
+                //
+                // Local case: begin a request, close the connection gracefully, and make sure it waits
+                // for the request to complete.
+                //
+                auto con = p->ice_getConnection();
+                auto sc = make_shared<promise<void>>();
+                con->setCloseCallback(
+                    [sc](Ice::ConnectionPtr connection)
+                    {
+                        sc->set_value();
+                    });
+                auto fc = sc->get_future();
+                auto s = make_shared<promise<void>>();
+                p->sleepAsync(100,
+                              [s]() { s->set_value(); },
+                              [s](exception_ptr ex) { s->set_exception(ex); });
+                auto f = s->get_future();
+                // Blocks until the request completes.
+                con->close(Ice::ICE_SCOPED_ENUM(ConnectionClose, GracefullyWithWait));
+                f.get(); // Should complete successfully.
+                fc.get();
+            }
+            {
+                //
+                // Remote case.
+                //
                 Ice::ByteSeq seq;
                 seq.resize(1024 * 10);
                 for(Ice::ByteSeq::iterator q = seq.begin(); q != seq.end(); ++q)
@@ -2170,10 +2218,11 @@ allTests(const Ice::CommunicatorPtr& communicator, bool collocated)
                     *q = static_cast<Ice::Byte>(IceUtilInternal::random(255));
                 }
 
-
+                //
                 // Send multiple opWithPayload, followed by a close and followed by multiple opWithPaylod.
                 // The goal is to make sure that none of the opWithPayload fail even if the server closes
                 // the connection gracefully in between.
+                //
 
                 int maxQueue = 2;
                 bool done = false;
@@ -2191,7 +2240,8 @@ allTests(const Ice::CommunicatorPtr& communicator, bool collocated)
                         results.push_back(s->get_future());
                     }
                     atomic_flag sent = ATOMIC_FLAG_INIT;
-                    p->closeAsync(false, nullptr, nullptr, [&sent](bool) { sent.test_and_set(); });
+                    p->closeAsync(Test::CloseMode::GracefullyWithWait, nullptr, nullptr,
+                                  [&sent](bool) { sent.test_and_set(); });
                     if(!sent.test_and_set())
                     {
                         for(int i = 0; i < maxQueue; i++)
@@ -2231,8 +2281,109 @@ allTests(const Ice::CommunicatorPtr& communicator, bool collocated)
                 }
             }
             cout << "ok" << endl;
-        }
 
+            cout << "testing graceful close connection without wait... " << flush;
+            {
+                //
+                // Local case: start an operation and then close the connection gracefully on the client side
+                // without waiting for the pending invocation to complete. There will be no retry and we expect the
+                // invocation to fail with ConnectionManuallyClosedException.
+                //
+                p = p->ice_connectionId("CloseGracefully"); // Start with a new connection.
+                auto con = p->ice_getConnection();
+                auto s = make_shared<promise<void>>();
+                auto sent = make_shared<promise<void>>();
+                p->startDispatchAsync([s]() { s->set_value(); },
+                                      [s](exception_ptr ex) { s->set_exception(ex); },
+                                      [sent](bool ss) { sent->set_value(); });
+                auto f = s->get_future();
+                sent->get_future().get(); // Ensure the request was sent before we close the connection.
+                con->close(Ice::ConnectionClose::Gracefully);
+                try
+                {
+                    f.get();
+                    test(false);
+                }
+                catch(const Ice::ConnectionManuallyClosedException& ex)
+                {
+                    test(ex.graceful);
+                }
+                p->finishDispatch();
+
+                //
+                // Remote case: the server closes the connection gracefully, which means the connection
+                // will not be closed until all pending dispatched requests have completed.
+                //
+                con = p->ice_getConnection();
+                auto sc = make_shared<promise<void>>();
+                con->setCloseCallback(
+                    [sc](Ice::ConnectionPtr connection)
+                    {
+                        sc->set_value();
+                    });
+                auto fc = sc->get_future();
+                s = make_shared<promise<void>>();
+                p->sleepAsync(100,
+                              [s]() { s->set_value(); },
+                              [s](exception_ptr ex) { s->set_exception(ex); });
+                f = s->get_future();
+                p->close(Test::CloseMode::Gracefully); // Close is delayed until sleep completes.
+                fc.get(); // Ensure connection was closed.
+                try
+                {
+                    f.get();
+                }
+                catch(const Ice::LocalException&)
+                {
+                    test(false);
+                }
+            }
+            cout << "ok" << endl;
+
+            cout << "testing forceful close connection... " << flush;
+            {
+                //
+                // Local case: start a lengthy operation and then close the connection forcefully on the client side.
+                // There will be no retry and we expect the invocation to fail with ConnectionManuallyClosedException.
+                //
+                p->ice_ping();
+                auto con = p->ice_getConnection();
+                auto s = make_shared<promise<void>>();
+                auto sent = make_shared<promise<void>>();
+                p->startDispatchAsync([s]() { s->set_value(); },
+                                      [s](exception_ptr ex) { s->set_exception(ex); },
+                                      [sent](bool ss) { sent->set_value(); });
+                auto f = s->get_future();
+                sent->get_future().get(); // Ensure the request was sent before we close the connection.
+                con->close(Ice::ConnectionClose::Forcefully);
+                try
+                {
+                    f.get();
+                    test(false);
+                }
+                catch(const Ice::ConnectionManuallyClosedException& ex)
+                {
+                    test(!ex.graceful);
+                }
+                p->finishDispatch();
+
+                //
+                // Remote case: the server closes the connection forcefully. This causes the request to fail
+                // with a ConnectionLostException. Since the close() operation is not idempotent, the client
+                // will not retry.
+                //
+                try
+                {
+                    p->close(Test::CloseMode::Forcefully);
+                    test(false);
+                }
+                catch(const Ice::ConnectionLostException&)
+                {
+                    // Expected.
+                }
+            }
+            cout << "ok" << endl;
+        }
     }
 
     p->shutdown();
@@ -2944,7 +3095,7 @@ allTests(const Ice::CommunicatorPtr& communicator, bool collocated)
                 test(p->opBatchCount() == 0);
                 Test::TestIntfPrx b1 = p->ice_batchOneway();
                 b1->opBatch();
-                b1->ice_getConnection()->close(false);
+                b1->ice_getConnection()->close(Ice::ICE_SCOPED_ENUM(ConnectionClose, GracefullyWithWait));
                 FlushCallbackPtr cb = new FlushCallback();
                 Ice::AsyncResultPtr r = b1->begin_ice_flushBatchRequests(
                     Ice::newCallback(cb, &FlushCallback::completedAsync, &FlushCallback::sentAsync));
@@ -2962,7 +3113,7 @@ allTests(const Ice::CommunicatorPtr& communicator, bool collocated)
                 test(p->opBatchCount() == 0);
                 Test::TestIntfPrx b1 = p->ice_batchOneway();
                 b1->opBatch();
-                b1->ice_getConnection()->close(false);
+                b1->ice_getConnection()->close(Ice::ICE_SCOPED_ENUM(ConnectionClose, GracefullyWithWait));
                 FlushCallbackPtr cb = new FlushCallback(cookie);
                 b1->begin_ice_flushBatchRequests(
                     Ice::newCallback(cb, &FlushCallback::completedAsync, &FlushCallback::sentAsync), cookie);
@@ -3013,7 +3164,7 @@ allTests(const Ice::CommunicatorPtr& communicator, bool collocated)
                 test(p->opBatchCount() == 0);
                 Test::TestIntfPrx b1 = p->ice_batchOneway();
                 b1->opBatch();
-                b1->ice_getConnection()->close(false);
+                b1->ice_getConnection()->close(Ice::ICE_SCOPED_ENUM(ConnectionClose, GracefullyWithWait));
                 FlushCallbackPtr cb = new FlushCallback();
                 Ice::AsyncResultPtr r = b1->begin_ice_flushBatchRequests(
                     Ice::newCallback_Object_ice_flushBatchRequests(cb, &FlushCallback::exception,
@@ -3031,7 +3182,7 @@ allTests(const Ice::CommunicatorPtr& communicator, bool collocated)
                 test(p->opBatchCount() == 0);
                 Test::TestIntfPrx b1 = p->ice_batchOneway();
                 b1->opBatch();
-                b1->ice_getConnection()->close(false);
+                b1->ice_getConnection()->close(Ice::ICE_SCOPED_ENUM(ConnectionClose, GracefullyWithWait));
                 FlushCallbackPtr cb = new FlushCallback(cookie);
                 b1->begin_ice_flushBatchRequests(
                     Ice::newCallback_Object_ice_flushBatchRequests(cb, &FlushCallback::exceptionWC,
@@ -3060,6 +3211,7 @@ allTests(const Ice::CommunicatorPtr& communicator, bool collocated)
                 b1->opBatch();
                 FlushCallbackPtr cb = new FlushCallback();
                 Ice::AsyncResultPtr r = b1->ice_getConnection()->begin_flushBatchRequests(
+                    Ice::ICE_SCOPED_ENUM(CompressBatch, BasedOnProxy),
                     Ice::newCallback(cb, &FlushCallback::completedAsync, &FlushCallback::sentAsync));
                 cb->check();
                 test(r->isSent());
@@ -3068,7 +3220,7 @@ allTests(const Ice::CommunicatorPtr& communicator, bool collocated)
 
                 // Ensure it also works with a twoway proxy
                 cb = new FlushCallback();
-                r = p->ice_getConnection()->begin_flushBatchRequests(
+                r = p->ice_getConnection()->begin_flushBatchRequests(Ice::ICE_SCOPED_ENUM(CompressBatch, BasedOnProxy),
                     Ice::newCallback(cb, &FlushCallback::completedAsync, &FlushCallback::sentAsync));
                 cb->check();
                 test(r->isSent());
@@ -3085,7 +3237,7 @@ allTests(const Ice::CommunicatorPtr& communicator, bool collocated)
                 b1->opBatch();
                 b1->opBatch();
                 FlushCallbackPtr cb = new FlushCallback(cookie);
-                b1->ice_getConnection()->begin_flushBatchRequests(
+                b1->ice_getConnection()->begin_flushBatchRequests(Ice::ICE_SCOPED_ENUM(CompressBatch, BasedOnProxy),
                     Ice::newCallback(cb, &FlushCallback::completedAsync, &FlushCallback::sentAsync), cookie);
                 cb->check();
                 test(p->waitForBatch(2));
@@ -3100,9 +3252,10 @@ allTests(const Ice::CommunicatorPtr& communicator, bool collocated)
                 Test::TestIntfPrx b1 = Test::TestIntfPrx::uncheckedCast(
                     p->ice_getConnection()->createProxy(p->ice_getIdentity())->ice_batchOneway());
                 b1->opBatch();
-                b1->ice_getConnection()->close(false);
+                b1->ice_getConnection()->close(Ice::ICE_SCOPED_ENUM(ConnectionClose, GracefullyWithWait));
                 FlushExCallbackPtr cb = new FlushExCallback();
                 Ice::AsyncResultPtr r = b1->ice_getConnection()->begin_flushBatchRequests(
+                    Ice::ICE_SCOPED_ENUM(CompressBatch, BasedOnProxy),
                     Ice::newCallback(cb, &FlushExCallback::completedAsync, &FlushExCallback::sentAsync));
                 cb->check();
                 test(!r->isSent());
@@ -3119,9 +3272,9 @@ allTests(const Ice::CommunicatorPtr& communicator, bool collocated)
                 Test::TestIntfPrx b1 = Test::TestIntfPrx::uncheckedCast(
                     p->ice_getConnection()->createProxy(p->ice_getIdentity())->ice_batchOneway());
                 b1->opBatch();
-                b1->ice_getConnection()->close(false);
+                b1->ice_getConnection()->close(Ice::ICE_SCOPED_ENUM(ConnectionClose, GracefullyWithWait));
                 FlushExCallbackPtr cb = new FlushExCallback(cookie);
-                b1->ice_getConnection()->begin_flushBatchRequests(
+                b1->ice_getConnection()->begin_flushBatchRequests(Ice::ICE_SCOPED_ENUM(CompressBatch, BasedOnProxy),
                     Ice::newCallback(cb, &FlushExCallback::completedAsync, &FlushExCallback::sentAsync), cookie);
                 cb->check();
                 test(p->opBatchCount() == 0);
@@ -3138,7 +3291,9 @@ allTests(const Ice::CommunicatorPtr& communicator, bool collocated)
                 b1->opBatch();
                 FlushCallbackPtr cb = new FlushCallback();
                 Ice::AsyncResultPtr r = b1->ice_getConnection()->begin_flushBatchRequests(
-                    Ice::newCallback_Connection_flushBatchRequests(cb, &FlushCallback::exception, &FlushCallback::sent));
+                    Ice::ICE_SCOPED_ENUM(CompressBatch, BasedOnProxy),
+                    Ice::newCallback_Connection_flushBatchRequests(cb, &FlushCallback::exception,
+                                                                   &FlushCallback::sent));
                 cb->check();
                 test(r->isSent());
                 test(r->isCompleted());
@@ -3155,7 +3310,7 @@ allTests(const Ice::CommunicatorPtr& communicator, bool collocated)
                 b1->opBatch();
                 b1->opBatch();
                 FlushCallbackPtr cb = new FlushCallback(cookie);
-                b1->ice_getConnection()->begin_flushBatchRequests(
+                b1->ice_getConnection()->begin_flushBatchRequests(Ice::ICE_SCOPED_ENUM(CompressBatch, BasedOnProxy),
                     Ice::newCallback_Connection_flushBatchRequests(cb, &FlushCallback::exceptionWC,
                                                                    &FlushCallback::sentWC), cookie);
                 cb->check();
@@ -3171,9 +3326,10 @@ allTests(const Ice::CommunicatorPtr& communicator, bool collocated)
                 Test::TestIntfPrx b1 = Test::TestIntfPrx::uncheckedCast(
                     p->ice_getConnection()->createProxy(p->ice_getIdentity())->ice_batchOneway());
                 b1->opBatch();
-                b1->ice_getConnection()->close(false);
+                b1->ice_getConnection()->close(Ice::ICE_SCOPED_ENUM(ConnectionClose, GracefullyWithWait));
                 FlushExCallbackPtr cb = new FlushExCallback();
                 Ice::AsyncResultPtr r = b1->ice_getConnection()->begin_flushBatchRequests(
+                    Ice::ICE_SCOPED_ENUM(CompressBatch, BasedOnProxy),
                     Ice::newCallback_Connection_flushBatchRequests(cb, &FlushExCallback::exception,
                                                                    &FlushExCallback::sent));
                 cb->check();
@@ -3191,9 +3347,9 @@ allTests(const Ice::CommunicatorPtr& communicator, bool collocated)
                 Test::TestIntfPrx b1 = Test::TestIntfPrx::uncheckedCast(
                     p->ice_getConnection()->createProxy(p->ice_getIdentity())->ice_batchOneway());
                 b1->opBatch();
-                b1->ice_getConnection()->close(false);
+                b1->ice_getConnection()->close(Ice::ICE_SCOPED_ENUM(ConnectionClose, GracefullyWithWait));
                 FlushExCallbackPtr cb = new FlushExCallback(cookie);
-                b1->ice_getConnection()->begin_flushBatchRequests(
+                b1->ice_getConnection()->begin_flushBatchRequests(Ice::ICE_SCOPED_ENUM(CompressBatch, BasedOnProxy),
                     Ice::newCallback_Connection_flushBatchRequests(cb, &FlushExCallback::exceptionWC,
                                                                    &FlushExCallback::sentWC), cookie);
                 cb->check();
@@ -3217,6 +3373,7 @@ allTests(const Ice::CommunicatorPtr& communicator, bool collocated)
                 b1->opBatch();
                 FlushCallbackPtr cb = new FlushCallback();
                 Ice::AsyncResultPtr r = communicator->begin_flushBatchRequests(
+                    Ice::ICE_SCOPED_ENUM(CompressBatch, BasedOnProxy),
                     Ice::newCallback(cb, &FlushCallback::completedAsync, &FlushCallback::sentAsync));
                 cb->check();
                 test(r->isSent());
@@ -3234,7 +3391,7 @@ allTests(const Ice::CommunicatorPtr& communicator, bool collocated)
                 b1->opBatch();
                 b1->opBatch();
                 FlushCallbackPtr cb = new FlushCallback(cookie);
-                communicator->begin_flushBatchRequests(
+                communicator->begin_flushBatchRequests(Ice::ICE_SCOPED_ENUM(CompressBatch, BasedOnProxy),
                     Ice::newCallback(cb, &FlushCallback::completedAsync, &FlushCallback::sentAsync), cookie);
                 cb->check();
                 test(p->waitForBatch(2));
@@ -3249,9 +3406,10 @@ allTests(const Ice::CommunicatorPtr& communicator, bool collocated)
                 Test::TestIntfPrx b1 = Test::TestIntfPrx::uncheckedCast(
                     p->ice_getConnection()->createProxy(p->ice_getIdentity())->ice_batchOneway());
                 b1->opBatch();
-                b1->ice_getConnection()->close(false);
+                b1->ice_getConnection()->close(Ice::ICE_SCOPED_ENUM(ConnectionClose, GracefullyWithWait));
                 FlushCallbackPtr cb = new FlushCallback();
                 Ice::AsyncResultPtr r = communicator->begin_flushBatchRequests(
+                    Ice::ICE_SCOPED_ENUM(CompressBatch, BasedOnProxy),
                     Ice::newCallback(cb, &FlushCallback::completedAsync, &FlushCallback::sentAsync));
                 cb->check();
                 test(r->isSent()); // Exceptions are ignored!
@@ -3268,9 +3426,9 @@ allTests(const Ice::CommunicatorPtr& communicator, bool collocated)
                 Test::TestIntfPrx b1 = Test::TestIntfPrx::uncheckedCast(
                     p->ice_getConnection()->createProxy(p->ice_getIdentity())->ice_batchOneway());
                 b1->opBatch();
-                b1->ice_getConnection()->close(false);
+                b1->ice_getConnection()->close(Ice::ICE_SCOPED_ENUM(ConnectionClose, GracefullyWithWait));
                 FlushCallbackPtr cb = new FlushCallback(cookie);
-                communicator->begin_flushBatchRequests(
+                communicator->begin_flushBatchRequests(Ice::ICE_SCOPED_ENUM(CompressBatch, BasedOnProxy),
                     Ice::newCallback(cb, &FlushCallback::completedAsync, &FlushCallback::sentAsync), cookie);
                 cb->check();
                 test(p->opBatchCount() == 0);
@@ -3294,6 +3452,7 @@ allTests(const Ice::CommunicatorPtr& communicator, bool collocated)
                 b2->opBatch();
                 FlushCallbackPtr cb = new FlushCallback();
                 Ice::AsyncResultPtr r = communicator->begin_flushBatchRequests(
+                    Ice::ICE_SCOPED_ENUM(CompressBatch, BasedOnProxy),
                     Ice::newCallback(cb, &FlushCallback::completedAsync, &FlushCallback::sentAsync));
                 cb->check();
                 test(r->isSent());
@@ -3319,9 +3478,10 @@ allTests(const Ice::CommunicatorPtr& communicator, bool collocated)
                 b2->ice_getConnection(); // Ensure connection is established.
                 b1->opBatch();
                 b2->opBatch();
-                b1->ice_getConnection()->close(false);
+                b1->ice_getConnection()->close(Ice::ICE_SCOPED_ENUM(ConnectionClose, GracefullyWithWait));
                 FlushCallbackPtr cb = new FlushCallback();
                 Ice::AsyncResultPtr r = communicator->begin_flushBatchRequests(
+                    Ice::ICE_SCOPED_ENUM(CompressBatch, BasedOnProxy),
                     Ice::newCallback(cb, &FlushCallback::completedAsync, &FlushCallback::sentAsync));
                 cb->check();
                 test(r->isSent()); // Exceptions are ignored!
@@ -3346,10 +3506,11 @@ allTests(const Ice::CommunicatorPtr& communicator, bool collocated)
                 b2->ice_getConnection(); // Ensure connection is established.
                 b1->opBatch();
                 b2->opBatch();
-                b1->ice_getConnection()->close(false);
-                b2->ice_getConnection()->close(false);
+                b1->ice_getConnection()->close(Ice::ICE_SCOPED_ENUM(ConnectionClose, GracefullyWithWait));
+                b2->ice_getConnection()->close(Ice::ICE_SCOPED_ENUM(ConnectionClose, GracefullyWithWait));
                 FlushCallbackPtr cb = new FlushCallback();
                 Ice::AsyncResultPtr r = communicator->begin_flushBatchRequests(
+                    Ice::ICE_SCOPED_ENUM(CompressBatch, BasedOnProxy),
                     Ice::newCallback(cb, &FlushCallback::completedAsync, &FlushCallback::sentAsync));
                 cb->check();
                 test(r->isSent()); // Exceptions are ignored!
@@ -3368,6 +3529,7 @@ allTests(const Ice::CommunicatorPtr& communicator, bool collocated)
                 b1->opBatch();
                 FlushCallbackPtr cb = new FlushCallback();
                 Ice::AsyncResultPtr r = communicator->begin_flushBatchRequests(
+                    Ice::ICE_SCOPED_ENUM(CompressBatch, BasedOnProxy),
                     Ice::newCallback_Communicator_flushBatchRequests(cb, &FlushCallback::exception,
                                                                      &FlushCallback::sent));
                 cb->check();
@@ -3386,7 +3548,7 @@ allTests(const Ice::CommunicatorPtr& communicator, bool collocated)
                 b1->opBatch();
                 b1->opBatch();
                 FlushCallbackPtr cb = new FlushCallback(cookie);
-                communicator->begin_flushBatchRequests(
+                communicator->begin_flushBatchRequests(Ice::ICE_SCOPED_ENUM(CompressBatch, BasedOnProxy),
                     Ice::newCallback_Communicator_flushBatchRequests(cb, &FlushCallback::exceptionWC,
                                                                      &FlushCallback::sentWC), cookie);
                 cb->check();
@@ -3402,9 +3564,10 @@ allTests(const Ice::CommunicatorPtr& communicator, bool collocated)
                 Test::TestIntfPrx b1 = Test::TestIntfPrx::uncheckedCast(
                     p->ice_getConnection()->createProxy(p->ice_getIdentity())->ice_batchOneway());
                 b1->opBatch();
-                b1->ice_getConnection()->close(false);
+                b1->ice_getConnection()->close(Ice::ICE_SCOPED_ENUM(ConnectionClose, GracefullyWithWait));
                 FlushCallbackPtr cb = new FlushCallback();
                 Ice::AsyncResultPtr r = communicator->begin_flushBatchRequests(
+                    Ice::ICE_SCOPED_ENUM(CompressBatch, BasedOnProxy),
                     Ice::newCallback_Communicator_flushBatchRequests(cb, &FlushCallback::exception,
                                                                      &FlushCallback::sent));
                 cb->check();
@@ -3422,9 +3585,9 @@ allTests(const Ice::CommunicatorPtr& communicator, bool collocated)
                 Test::TestIntfPrx b1 = Test::TestIntfPrx::uncheckedCast(
                     p->ice_getConnection()->createProxy(p->ice_getIdentity())->ice_batchOneway());
                 b1->opBatch();
-                b1->ice_getConnection()->close(false);
+                b1->ice_getConnection()->close(Ice::ICE_SCOPED_ENUM(ConnectionClose, GracefullyWithWait));
                 FlushCallbackPtr cb = new FlushCallback(cookie);
-                communicator->begin_flushBatchRequests(
+                communicator->begin_flushBatchRequests(Ice::ICE_SCOPED_ENUM(CompressBatch, BasedOnProxy),
                     Ice::newCallback_Communicator_flushBatchRequests(cb, &FlushCallback::exceptionWC,
                                                                      &FlushCallback::sentWC), cookie);
                 cb->check();
@@ -3450,6 +3613,7 @@ allTests(const Ice::CommunicatorPtr& communicator, bool collocated)
                 b2->opBatch();
                 FlushCallbackPtr cb = new FlushCallback();
                 Ice::AsyncResultPtr r = communicator->begin_flushBatchRequests(
+                    Ice::ICE_SCOPED_ENUM(CompressBatch, BasedOnProxy),
                     Ice::newCallback_Communicator_flushBatchRequests(cb, &FlushCallback::exception,
                                                                      &FlushCallback::sent));
                 cb->check();
@@ -3476,9 +3640,10 @@ allTests(const Ice::CommunicatorPtr& communicator, bool collocated)
                 b2->ice_getConnection(); // Ensure connection is established.
                 b1->opBatch();
                 b2->opBatch();
-                b1->ice_getConnection()->close(false);
+                b1->ice_getConnection()->close(Ice::ICE_SCOPED_ENUM(ConnectionClose, GracefullyWithWait));
                 FlushCallbackPtr cb = new FlushCallback();
                 Ice::AsyncResultPtr r = communicator->begin_flushBatchRequests(
+                    Ice::ICE_SCOPED_ENUM(CompressBatch, BasedOnProxy),
                     Ice::newCallback_Communicator_flushBatchRequests(cb, &FlushCallback::exception,
                                                                      &FlushCallback::sent));
                 cb->check();
@@ -3504,10 +3669,11 @@ allTests(const Ice::CommunicatorPtr& communicator, bool collocated)
                 b2->ice_getConnection(); // Ensure connection is established.
                 b1->opBatch();
                 b2->opBatch();
-                b1->ice_getConnection()->close(false);
-                b2->ice_getConnection()->close(false);
+                b1->ice_getConnection()->close(Ice::ICE_SCOPED_ENUM(ConnectionClose, GracefullyWithWait));
+                b2->ice_getConnection()->close(Ice::ICE_SCOPED_ENUM(ConnectionClose, GracefullyWithWait));
                 FlushCallbackPtr cb = new FlushCallback();
                 Ice::AsyncResultPtr r = communicator->begin_flushBatchRequests(
+                    Ice::ICE_SCOPED_ENUM(CompressBatch, BasedOnProxy),
                     Ice::newCallback_Communicator_flushBatchRequests(cb, &FlushCallback::exception,
                                                                      &FlushCallback::sent));
                 cb->check();
@@ -3626,7 +3792,7 @@ allTests(const Ice::CommunicatorPtr& communicator, bool collocated)
                 Ice::ConnectionPtr con = p->ice_getConnection();
                 p2 = p->ice_batchOneway();
                 p2->ice_ping();
-                r = con->begin_flushBatchRequests();
+                r = con->begin_flushBatchRequests(Ice::ICE_SCOPED_ENUM(CompressBatch, BasedOnProxy));
                 test(r->getConnection() == con);
                 test(r->getCommunicator() == communicator);
                 test(!r->getProxy()); // Expected
@@ -3637,7 +3803,7 @@ allTests(const Ice::CommunicatorPtr& communicator, bool collocated)
                 //
                 p2 = p->ice_batchOneway();
                 p2->ice_ping();
-                r = communicator->begin_flushBatchRequests();
+                r = communicator->begin_flushBatchRequests(Ice::ICE_SCOPED_ENUM(CompressBatch, BasedOnProxy));
                 test(!r->getConnection()); // Expected
                 test(r->getCommunicator() == communicator);
                 test(!r->getProxy()); // Expected
@@ -3715,8 +3881,33 @@ allTests(const Ice::CommunicatorPtr& communicator, bool collocated)
 
     if(p->ice_getConnection() && protocol != "bt")
     {
-        cout << "testing close connection with sending queue... " << flush;
+        cout << "testing graceful close connection with wait... " << flush;
         {
+            //
+            // Local case: begin a request, close the connection gracefully, and make sure it waits
+            // for the request to complete.
+            //
+            Ice::ConnectionPtr con = p->ice_getConnection();
+            CloseCallbackPtr cb = new CloseCallback;
+            con->setCloseCallback(cb);
+            Ice::AsyncResultPtr r = p->begin_sleep(100);
+            // Blocks until the request completes.
+            con->close(Ice::ICE_SCOPED_ENUM(ConnectionClose, GracefullyWithWait));
+            r->waitForCompleted(); // Should complete successfully.
+            try
+            {
+                r->throwLocalException();
+            }
+            catch(const Ice::LocalException&)
+            {
+                test(false);
+            }
+            cb->check();
+        }
+        {
+            //
+            // Remote case.
+            //
             Ice::ByteSeq seq;
             seq.resize(1024 * 10);
             for(Ice::ByteSeq::iterator q = seq.begin(); q != seq.end(); ++q)
@@ -3740,7 +3931,7 @@ allTests(const Ice::CommunicatorPtr& communicator, bool collocated)
                 {
                     results.push_back(p->begin_opWithPayload(seq));
                 }
-                if(!p->begin_close(false)->isSent())
+                if(!p->begin_close(Test::GracefullyWithWait)->isSent())
                 {
                     for(int i = 0; i < maxQueue; i++)
                     {
@@ -3772,6 +3963,92 @@ allTests(const Ice::CommunicatorPtr& communicator, bool collocated)
                         test(false);
                     }
                 }
+            }
+        }
+        cout << "ok" << endl;
+
+        cout << "testing graceful close connection without wait... " << flush;
+        {
+            //
+            // Local case: start an operation and then close the connection gracefully on the client side
+            // without waiting for the pending invocation to complete. There will be no retry and we expect the
+            // invocation to fail with ConnectionManuallyClosedException.
+            //
+            p = p->ice_connectionId("CloseGracefully"); // Start with a new connection.
+            Ice::ConnectionPtr con = p->ice_getConnection();
+            Ice::AsyncResultPtr r = p->begin_startDispatch();
+            r->waitForSent(); // Ensure the request was sent before we close the connection.
+            con->close(Ice::ICE_SCOPED_ENUM(ConnectionClose, Gracefully));
+            r->waitForCompleted();
+            try
+            {
+                r->throwLocalException();
+                test(false);
+            }
+            catch(const Ice::ConnectionManuallyClosedException& ex)
+            {
+                test(ex.graceful);
+            }
+            p->finishDispatch();
+
+            //
+            // Remote case: the server closes the connection gracefully, which means the connection
+            // will not be closed until all pending dispatched requests have completed.
+            //
+            con = p->ice_getConnection();
+            CloseCallbackPtr cb = new CloseCallback;
+            con->setCloseCallback(cb);
+            r = p->begin_sleep(100);
+            p->close(Test::Gracefully); // Close is delayed until sleep completes.
+            cb->check(); // Ensure connection was closed.
+            r->waitForCompleted();
+            try
+            {
+                r->throwLocalException();
+            }
+            catch(const Ice::LocalException&)
+            {
+                test(false);
+            }
+        }
+        cout << "ok" << endl;
+
+        cout << "testing forceful close connection... " << flush;
+        {
+            //
+            // Local case: start an operation and then close the connection forcefully on the client side.
+            // There will be no retry and we expect the invocation to fail with ConnectionManuallyClosedException.
+            //
+            p->ice_ping();
+            Ice::ConnectionPtr con = p->ice_getConnection();
+            Ice::AsyncResultPtr r = p->begin_startDispatch();
+            r->waitForSent(); // Ensure the request was sent before we close the connection.
+            con->close(Ice::ICE_SCOPED_ENUM(ConnectionClose, Forcefully));
+            r->waitForCompleted();
+            try
+            {
+                r->throwLocalException();
+                test(false);
+            }
+            catch(const Ice::ConnectionManuallyClosedException& ex)
+            {
+                test(!ex.graceful);
+            }
+            p->finishDispatch();
+
+            //
+            // Remote case: the server closes the connection forcefully. This causes the request to fail
+            // with a ConnectionLostException. Since the close() operation is not idempotent, the client
+            // will not retry.
+            //
+            try
+            {
+                p->close(Test::Forcefully);
+                test(false);
+            }
+            catch(const Ice::ConnectionLostException&)
+            {
+                // Expected.
             }
         }
         cout << "ok" << endl;

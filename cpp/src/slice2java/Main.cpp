@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -11,6 +11,7 @@
 #include <IceUtil/CtrlCHandler.h>
 #include <IceUtil/Mutex.h>
 #include <IceUtil/MutexPtrLock.h>
+#include <IceUtil/ConsoleUtil.h>
 #include <Slice/Preprocessor.h>
 #include <Slice/FileTracker.h>
 #include <Slice/Util.h>
@@ -20,6 +21,7 @@
 
 using namespace std;
 using namespace Slice;
+using namespace IceUtilInternal;
 
 namespace
 {
@@ -58,8 +60,8 @@ interruptedCallback(int /*signal*/)
 void
 usage(const string& n)
 {
-    getErrorStream() << "Usage: " << n << " [options] slice-files...\n";
-    getErrorStream() <<
+    consoleErr << "Usage: " << n << " [options] slice-files...\n";
+    consoleErr <<
         "Options:\n"
         "-h, --help              Show this message.\n"
         "-v, --version           Display the Ice version.\n"
@@ -122,7 +124,7 @@ compile(const vector<string>& argv)
     }
     catch(const IceUtilInternal::BadOptException& e)
     {
-        getErrorStream() << argv[0] << ": error: " << e.reason << endl;
+        consoleErr << argv[0] << ": error: " << e.reason << endl;
         if(!validate)
         {
             usage(argv[0]);
@@ -138,7 +140,7 @@ compile(const vector<string>& argv)
 
     if(opts.isSet("version"))
     {
-        getErrorStream() << ICE_STRING_VERSION << endl;
+        consoleErr << ICE_STRING_VERSION << endl;
         return EXIT_SUCCESS;
     }
 
@@ -193,7 +195,7 @@ compile(const vector<string>& argv)
 
     if(args.empty())
     {
-        getErrorStream() << argv[0] << ": error: no input file" << endl;
+        consoleErr << argv[0] << ": error: no input file" << endl;
         if(!validate)
         {
             usage(argv[0]);
@@ -203,7 +205,7 @@ compile(const vector<string>& argv)
 
     if(impl && implTie)
     {
-        getErrorStream() << argv[0] << ": error: cannot specify both --impl and --impl-tie" << endl;
+        consoleErr << argv[0] << ": error: cannot specify both --impl and --impl-tie" << endl;
         if(!validate)
         {
             usage(argv[0]);
@@ -213,7 +215,7 @@ compile(const vector<string>& argv)
 
     if(!compat && (tie || implTie))
     {
-        getErrorStream() << argv[0] << ": error: TIE classes are only supported with the Java-Compat mapping" << endl;
+        consoleErr << argv[0] << ": error: TIE classes are only supported with the Java-Compat mapping" << endl;
         if(!validate)
         {
             usage(argv[0]);
@@ -223,7 +225,7 @@ compile(const vector<string>& argv)
 
     if(depend && dependxml)
     {
-        getErrorStream() << argv[0] << ": error: cannot specify both --depend and --depend-xml" << endl;
+        consoleErr << argv[0] << ": error: cannot specify both --depend and --depend-xml" << endl;
         if(!validate)
         {
             usage(argv[0]);
@@ -243,10 +245,10 @@ compile(const vector<string>& argv)
     IceUtil::CtrlCHandler ctrlCHandler;
     ctrlCHandler.setCallback(interruptedCallback);
 
-    DependOutputUtil out(dependFile);
+    ostringstream os;
     if(dependxml)
     {
-        out.os() << "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<dependencies>" << endl;
+        os << "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<dependencies>" << endl;
     }
 
     vector<string> cppOpts;
@@ -274,7 +276,6 @@ compile(const vector<string>& argv)
 
             if(cppHandle == 0)
             {
-                out.cleanup();
                 return EXIT_FAILURE;
             }
 
@@ -284,31 +285,23 @@ compile(const vector<string>& argv)
 
             if(parseStatus == EXIT_FAILURE)
             {
-                out.cleanup();
                 return EXIT_FAILURE;
             }
 
-            if(!icecpp->printMakefileDependencies(out.os(), depend ? Preprocessor::Java : Preprocessor::SliceXML,
+            if(!icecpp->printMakefileDependencies(os, depend ? Preprocessor::Java : Preprocessor::SliceXML,
                                                   includePaths, cppOpts))
             {
-                out.cleanup();
                 return EXIT_FAILURE;
             }
 
             if(!icecpp->close())
             {
-                out.cleanup();
                 return EXIT_FAILURE;
             }
         }
         else
         {
             ostringstream os;
-            if(listGenerated)
-            {
-                Slice::setErrorStream(os);
-            }
-
             FileTracker::instance()->setSource(*i);
 
             PreprocessorPtr icecpp = Preprocessor::create(argv[0], *i, cppArgs);
@@ -316,10 +309,7 @@ compile(const vector<string>& argv)
 
             if(cppHandle == 0)
             {
-                if(listGenerated)
-                {
-                    FileTracker::instance()->setOutput(os.str(), true);
-                }
+                FileTracker::instance()->error();
                 status = EXIT_FAILURE;
                 break;
             }
@@ -327,7 +317,7 @@ compile(const vector<string>& argv)
             if(preprocess)
             {
                 char buf[4096];
-                while(fgets(buf, static_cast<int>(sizeof(buf)), cppHandle) != NULL)
+                while(fgets(buf, static_cast<int>(sizeof(buf)), cppHandle) != ICE_NULLPTR)
                 {
                     if(fputs(buf, stdout) == EOF)
                     {
@@ -347,16 +337,13 @@ compile(const vector<string>& argv)
                 if(!icecpp->close())
                 {
                     p->destroy();
+                    FileTracker::instance()->error();
                     return EXIT_FAILURE;
                 }
 
                 if(parseStatus == EXIT_FAILURE)
                 {
                     p->destroy();
-                    if(listGenerated)
-                    {
-                        FileTracker::instance()->setOutput(os.str(), true);
-                    }
                     status = EXIT_FAILURE;
                 }
                 else
@@ -375,18 +362,6 @@ compile(const vector<string>& argv)
                             {
                                 gen.generateImplTie(p);
                             }
-                            if(!checksumClass.empty())
-                            {
-                                //
-                                // Calculate checksums for the Slice definitions in the unit.
-                                //
-                                ChecksumMap m = createChecksums(p);
-                                copy(m.begin(), m.end(), inserter(checksums, checksums.begin()));
-                            }
-                            if(listGenerated)
-                            {
-                                FileTracker::instance()->setOutput(os.str(), false);
-                            }
                         }
                         else
                         {
@@ -396,18 +371,15 @@ compile(const vector<string>& argv)
                             {
                                 gen.generateImpl(p);
                             }
-                            if(!checksumClass.empty())
-                            {
-                                //
-                                // Calculate checksums for the Slice definitions in the unit.
-                                //
-                                ChecksumMap m = createChecksums(p);
-                                copy(m.begin(), m.end(), inserter(checksums, checksums.begin()));
-                            }
-                            if(listGenerated)
-                            {
-                                FileTracker::instance()->setOutput(os.str(), false);
-                            }
+                        }
+
+                        if(!checksumClass.empty())
+                        {
+                            //
+                            // Calculate checksums for the Slice definitions in the unit.
+                            //
+                            ChecksumMap m = createChecksums(p);
+                            copy(m.begin(), m.end(), inserter(checksums, checksums.begin()));
                         }
                     }
                     catch(const Slice::FileException& ex)
@@ -417,12 +389,9 @@ compile(const vector<string>& argv)
                         //
                         FileTracker::instance()->cleanup();
                         p->destroy();
-                        getErrorStream() << argv[0] << ": error: " << ex.reason() << endl;
-                        if(listGenerated)
-                        {
-                            FileTracker::instance()->setOutput(os.str(), true);
-                        }
+                        consoleErr << argv[0] << ": error: " << ex.reason() << endl;
                         status = EXIT_FAILURE;
+                        FileTracker::instance()->error();
                         break;
                     }
                 }
@@ -435,7 +404,6 @@ compile(const vector<string>& argv)
 
             if(interrupted)
             {
-                out.cleanup();
                 //
                 // If the translator was interrupted then cleanup any files we've already created.
                 //
@@ -447,7 +415,12 @@ compile(const vector<string>& argv)
 
     if(dependxml)
     {
-        out.os() << "</dependencies>\n";
+        os << "</dependencies>\n";
+    }
+
+    if(depend || dependxml)
+    {
+        writeDependencies(os.str(), dependFile);
     }
 
     if(status == EXIT_SUCCESS && !checksumClass.empty() && !dependxml)
@@ -462,7 +435,7 @@ compile(const vector<string>& argv)
             // If a file could not be created, then cleanup any created files.
             //
             FileTracker::instance()->cleanup();
-            getErrorStream() << argv[0] << ": error: " << ex.reason() << endl;
+            consoleErr << argv[0] << ": error: " << ex.reason() << endl;
             return EXIT_FAILURE;
         }
     }
@@ -488,22 +461,22 @@ int main(int argc, char* argv[])
     }
     catch(const std::exception& ex)
     {
-        getErrorStream() << args[0] << ": error:" << ex.what() << endl;
+        consoleErr << args[0] << ": error:" << ex.what() << endl;
         return EXIT_FAILURE;
     }
     catch(const std::string& msg)
     {
-        getErrorStream() << args[0] << ": error:" << msg << endl;
+        consoleErr << args[0] << ": error:" << msg << endl;
         return EXIT_FAILURE;
     }
     catch(const char* msg)
     {
-        getErrorStream() << args[0] << ": error:" << msg << endl;
+        consoleErr << args[0] << ": error:" << msg << endl;
         return EXIT_FAILURE;
     }
     catch(...)
     {
-        getErrorStream() << args[0] << ": error:" << "unknown exception" << endl;
+        consoleErr << args[0] << ": error:" << "unknown exception" << endl;
         return EXIT_FAILURE;
     }
 }

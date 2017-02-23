@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -20,12 +20,7 @@ using OneOptionalPrxPtr = std::shared_ptr<Ice::ObjectPrx>;
 #endif
 
 
-class InitialI :
-#ifdef ICE_CPP11_MAPPING
-    public Test::InitialDisp
-#else
-    public Test::Initial
-#endif
+class InitialI : public Test::Initial
 {
 public:
 

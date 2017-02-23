@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -134,7 +134,7 @@ public class InitialI : Test.InitialDisp_
     }
 
     public override Task<Initial_OpOneOptionalProxyResult>
-    opOneOptionalProxyAsync(Ice.Optional<OneOptionalPrx> p1, Ice.Current current)
+    opOneOptionalProxyAsync(Ice.Optional<Ice.ObjectPrx> p1, Ice.Current current)
     {
         return Task.FromResult<Initial_OpOneOptionalProxyResult>(new Initial_OpOneOptionalProxyResult(p1, p1));
     }

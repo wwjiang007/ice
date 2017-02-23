@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -9,10 +9,8 @@
 
 namespace IceInternal
 {
-
     using System.Collections.Generic;
     using System.Diagnostics;
-    using System.Text.RegularExpressions;
 
     public sealed class EndpointFactoryManager
     {
@@ -28,7 +26,7 @@ namespace IceInternal
             {
                 for(int i = 0; i < _factories.Count; i++)
                 {
-                    EndpointFactory f = (EndpointFactory)_factories[i];
+                    EndpointFactory f = _factories[i];
                     if(f.type() == factory.type())
                     {
                         Debug.Assert(false);
@@ -44,7 +42,7 @@ namespace IceInternal
             {
                 for(int i = 0; i < _factories.Count; i++)
                 {
-                    EndpointFactory f = (EndpointFactory)_factories[i];
+                    EndpointFactory f = _factories[i];
                     if(f.type() == type)
                     {
                         return f;

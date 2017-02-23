@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -10,6 +10,7 @@
 #include <IceUtil/Options.h>
 #include <IceUtil/StringUtil.h>
 #include <Ice/Ice.h>
+#include <Ice/ConsoleUtil.h>
 #include <Ice/DynamicLibrary.h>
 #include <Ice/SliceChecksums.h>
 #include <Ice/Initialize.h>
@@ -17,6 +18,7 @@
 #include <IceBox/ServiceManagerI.h>
 
 using namespace Ice;
+using namespace IceUtilInternal;
 using namespace IceBox;
 using namespace std;
 
@@ -467,7 +469,7 @@ IceBox::ServiceManagerI::start()
         string bundleName = properties->getProperty("IceBox.PrintServicesReady");
         if(!bundleName.empty())
         {
-            cout << bundleName << " ready" << endl;
+            consoleOut << bundleName << " ready" << endl;
         }
 
         //
@@ -674,7 +676,7 @@ IceBox::ServiceManagerI::start(const string& service, const string& entryPoint, 
       // xlC warns when casting a void* to function pointer
 #   pragma report(disable, "1540-0216")
 #endif
-      
+
         SERVICE_FACTORY factory = reinterpret_cast<SERVICE_FACTORY>(sym);
         try
         {
@@ -858,17 +860,8 @@ IceBox::ServiceManagerI::stopAll()
         {
             removeAdminFacets("IceBox.Service." + info.name + ".");
 
-            try
-            {
-                info.communicator->destroy();
-                info.communicator = 0;
-            }
-            catch(const Exception& ex)
-            {
-                Warning out(_logger);
-                out << "ServiceManager: exception while stopping service " << info.name << ":\n";
-                out << ex;
-            }
+            info.communicator->destroy();
+            info.communicator = 0;
         }
 
         try
@@ -1124,17 +1117,7 @@ IceBox::ServiceManagerI::destroyServiceCommunicator(const string& service, const
     }
 
     removeAdminFacets("IceBox.Service." + service + ".");
-
-    try
-    {
-        communicator->destroy();
-    }
-    catch(const Exception& ex)
-    {
-        Warning out(_logger);
-        out << "ServiceManager: exception in shutting down communicator for service " << service << ":\n";
-        out << ex;
-    }
+    communicator->destroy();
 }
 
 bool

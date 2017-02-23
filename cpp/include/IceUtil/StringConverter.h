@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -63,6 +63,15 @@ public:
     {
     }
 };
+
+#ifdef __clang__
+//
+// Explicit template instantiation so that dynamic_cast of derived exported
+// classes works well with clang, see ICE-7473.
+//
+template class ICE_API BasicStringConverter<char>;
+template class ICE_API BasicStringConverter<wchar_t>;
+#endif
 
 typedef BasicStringConverter<char> StringConverter;
 ICE_DEFINE_PTR(StringConverterPtr, StringConverter);
@@ -157,5 +166,17 @@ ICE_API std::vector<unsigned int> toUTF32(const std::vector<IceUtil::Byte>&);
 ICE_API std::vector<IceUtil::Byte> fromUTF32(const std::vector<unsigned int>&);
 
 }
+
+#ifdef _WIN32
+namespace IceUtil
+{
+//
+// Create a StringConverter that converts to and from narrow chars
+// in the given code page, using MultiByteToWideChar and WideCharToMultiByte
+//
+ICE_API StringConverterPtr createWindowsStringConverter(unsigned int);
+
+}
+#endif
 
 #endif

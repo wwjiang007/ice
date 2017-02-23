@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -246,7 +246,7 @@ public class AllTests
 
         try
         {
-            b1 = communicator.stringToProxy("test:tcp@adapterId");
+            communicator.stringToProxy("test:tcp@adapterId");
             test(false);
         }
         catch(com.zeroc.Ice.EndpointParseException ex)
@@ -264,7 +264,37 @@ public class AllTests
         //}
         try
         {
-            b1 = communicator.stringToProxy("test::tcp");
+            communicator.stringToProxy("test: :tcp");
+            test(false);
+        }
+        catch(com.zeroc.Ice.EndpointParseException ex)
+        {
+        }
+
+        //
+        // Test invalid endpoint syntax
+        //
+        try
+        {
+            communicator.createObjectAdapterWithEndpoints("BadAdapter", " : ");
+            test(false);
+        }
+        catch(com.zeroc.Ice.EndpointParseException ex)
+        {
+        }
+
+        try
+        {
+            communicator.createObjectAdapterWithEndpoints("BadAdapter", "tcp: ");
+            test(false);
+        }
+        catch(com.zeroc.Ice.EndpointParseException ex)
+        {
+        }
+
+        try
+        {
+            communicator.createObjectAdapterWithEndpoints("BadAdapter", ":tcp");
             test(false);
         }
         catch(com.zeroc.Ice.EndpointParseException ex)
@@ -352,6 +382,26 @@ public class AllTests
         test(idStr.equals("greek \\360\\220\\205\\252/banana \\016-\\360\\237\\215\\214\\342\\202\\254\\302\\242$"));
         test(id.equals(id2));
 
+        out.println("ok");
+
+        out.print("testing proxyToString... ");
+        out.flush();
+        b1 = communicator.stringToProxy(ref);
+        com.zeroc.Ice.ObjectPrx b2 = communicator.stringToProxy(communicator.proxyToString(b1));
+        test(b1.equals(b2));
+
+        if(b1.ice_getConnection() != null) // not colloc-optimized target
+        {
+            b2 = b1.ice_getConnection().createProxy(com.zeroc.Ice.Util.stringToIdentity("fixed"));
+            String str = communicator.proxyToString(b2);
+            test(b2.toString().equals(str));
+            String str2 = b1.ice_identity(b2.ice_getIdentity()).ice_secure(b2.ice_isSecure()).toString();
+
+            // Verify that the stringified fixed proxy is the same as a regular stringified proxy
+            // but without endpoints
+            test(str2.startsWith(str));
+            test(str2.charAt(str.length()) == ':');
+        }
         out.println("ok");
 
         out.print("testing propertyToProxy... ");

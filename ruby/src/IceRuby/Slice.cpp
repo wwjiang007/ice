@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -187,22 +187,22 @@ IceRuby_compile(int argc, VALUE* argv, VALUE self)
         }
         catch(const std::exception& ex)
         {
-            getErrorStream() << argSeq[0] << ": error:" << ex.what() << endl;
+            cerr << argSeq[0] << ": error:" << ex.what() << endl;
             rc = EXIT_FAILURE;
         }
         catch(const std::string& msg)
         {
-            getErrorStream() << argSeq[0] << ": error:" << msg << endl;
+            cerr << argSeq[0] << ": error:" << msg << endl;
             rc = EXIT_FAILURE;
         }
         catch(const char* msg)
         {
-            getErrorStream() << argSeq[0] << ": error:" << msg << endl;
+            cerr << argSeq[0] << ": error:" << msg << endl;
             rc = EXIT_FAILURE;
         }
         catch(...)
         {
-            getErrorStream() << argSeq[0] << ": error:" << "unknown exception" << endl;
+            cerr << argSeq[0] << ": error:" << "unknown exception" << endl;
             rc = EXIT_FAILURE;
         }
         return INT2FIX(rc);

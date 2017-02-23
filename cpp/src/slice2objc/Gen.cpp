@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -12,9 +12,9 @@
 #include <limits>
 #include <sys/stat.h>
 #ifndef _WIN32
-#include <unistd.h>
+#  include <unistd.h>
 #else
-#include <direct.h>
+#  include <direct.h>
 #endif
 #include <IceUtil/Iterator.h>
 #include <IceUtil/UUID.h>
@@ -90,6 +90,23 @@ opFormatTypeToString(const OperationPtr& op)
 }
 
 string
+getDeprecateSymbol(const ContainedPtr& p1, const ContainedPtr& p2)
+{
+    string deprecateMetadata, deprecateSymbol;
+    if(p1->findMetaData("deprecate", deprecateMetadata) ||
+       (p2 != 0 && p2->findMetaData("deprecate", deprecateMetadata)))
+    {
+        string msg = "is deprecated";
+        if(deprecateMetadata.find("deprecate:") == 0 && deprecateMetadata.size() > 10)
+        {
+            msg = deprecateMetadata.substr(10);
+        }
+        deprecateSymbol = " ICE_DEPRECATED_API(\"" + msg + "\")";
+    }
+    return deprecateSymbol;
+}
+
+string
 getEscapedParamName(const OperationPtr& p, const string& name)
 {
     ParamDeclList params = p->parameters();
@@ -116,7 +133,10 @@ public:
 
 }
 
-Slice::ObjCVisitor::ObjCVisitor(Output& h, Output& m, const string& dllExport) : _H(h), _M(m), _dllExport(dllExport)
+Slice::ObjCVisitor::ObjCVisitor(Output& h, Output& m, const string& dllExport) :
+    _H(h),
+    _M(m),
+    _dllExport(dllExport)
 {
 }
 
@@ -637,11 +657,11 @@ Slice::ObjCVisitor::getServerArgs(const OperationPtr& op) const
 }
 
 Slice::Gen::Gen(const string& name, const string& base, const string& include, const vector<string>& includePaths,
-                const string& dir, const string& dllExport)
-    : _base(base),
-      _include(include),
-      _includePaths(includePaths),
-      _dllExport(dllExport)
+                const string& dir, const string& dllExport) :
+    _base(base),
+    _include(include),
+    _includePaths(includePaths),
+    _dllExport(dllExport)
 {
     for(vector<string>::iterator p = _includePaths.begin(); p != _includePaths.end(); ++p)
     {
@@ -759,8 +779,6 @@ Slice::Gen::generate(const UnitPtr& p)
     // Necessary for objc_getClass use when marshalling/unmarshalling proxies.
     _M << nl << "#import <objc/runtime.h>";
 
-    _M << nl;
-
     StringList includes = p->includeFiles();
     for(StringList::const_iterator q = includes.begin(); q != includes.end(); ++q)
     {
@@ -787,7 +805,6 @@ Slice::Gen::generate(const UnitPtr& p)
         _M << nl << "#ifndef " << _dllExport << "_EXPORTS";
         _M << nl << "#   define " << _dllExport << "_EXPORTS";
         _M << nl << "#endif";
-        _M << nl;
 
         _H << nl;
         _H << nl << "#ifndef " << _dllExport;
@@ -805,6 +822,15 @@ Slice::Gen::generate(const UnitPtr& p)
     {
         _dllExport += " ";
     }
+
+    //
+    // Disable shadow warnings in .cppm file
+    //
+    _M << sp;
+    _M.zeroIndent();
+    _M << nl << "#ifdef __clang__";
+    _M << nl << "#   pragma clang diagnostic ignored \"-Wshadow-ivar\"";
+    _M << nl << "#endif";
 
     UnitVisitor unitVisitor(_H, _M, _dllExport);
     p->visit(&unitVisitor, false);
@@ -841,7 +867,7 @@ Slice::Gen::printHeader(Output& o)
     static const char* header =
 "// **********************************************************************\n"
 "//\n"
-"// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.\n"
+"// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.\n"
 "//\n"
 "// This copy of Ice is licensed to you under the terms described in the\n"
 "// ICE_LICENSE file included in this distribution.\n"
@@ -1170,6 +1196,8 @@ Slice::Gen::TypesVisitor::visitOperation(const OperationPtr& p)
         params = getServerParams(p);
     }
 
+    const string deprecateSymbol = getDeprecateSymbol(p, cl);
+
     _H << nl << "-(" << retString << ") " << name << params;
     if(!cl->isLocal())
     {
@@ -1177,21 +1205,38 @@ Slice::Gen::TypesVisitor::visitOperation(const OperationPtr& p)
         {
             _H << " current";
         }
-        _H << ":(ICECurrent *)" << getEscapedParamName(p, "current") << ";";
+        _H << ":(ICECurrent *)" << getEscapedParamName(p, "current") << deprecateSymbol << ";";
     }
     else
     {
-        _H << ";";
+        _H << deprecateSymbol << ";";
     }
 
     if(cl->isLocal() && (cl->hasMetaData("async-oneway") || p->hasMetaData("async-oneway")))
     {
-        // TODO: add support for parameters when needed.
-        _H << nl << "-(id<ICEAsyncResult>) begin_" << name << ";";
-        _H << nl << "-(id<ICEAsyncResult>) begin_" << name << ":(void(^)(ICEException*))exception;";
-        _H << nl << "-(id<ICEAsyncResult>) begin_" << name
-           << ":(void(^)(ICEException*))exception sent:(void(^)(BOOL))sent;";
-        _H << nl << "-(void) end_" << name << ":(id<ICEAsyncResult>)result;";
+        string marshalParams = getMarshalParams(p);
+        string unmarshalParams = getUnmarshalParams(p);
+
+        _H << nl << "-(id<ICEAsyncResult>) begin_" << name << marshalParams << deprecateSymbol << ";";
+        _H << nl << "-(id<ICEAsyncResult>) begin_" << name << marshalParams;
+        if(!marshalParams.empty())
+        {
+            _H << " exception";
+        }
+        _H << ":(void(^)(ICEException*))exception" << deprecateSymbol << ";";
+        _H << nl << "-(id<ICEAsyncResult>) begin_" << name << marshalParams;
+        if(!marshalParams.empty())
+        {
+            _H << " exception";
+        }
+        _H << ":(void(^)(ICEException*))exception sent:(void(^)(BOOL))sent" << deprecateSymbol << ";";
+
+        _H << nl << "-(void) end_" << name << unmarshalParams;
+        if(!unmarshalParams.empty())
+        {
+            _H << " result";
+        }
+        _H << ":(id<ICEAsyncResult>)result" << deprecateSymbol << ";";
     }
 }
 
@@ -1478,7 +1523,9 @@ void
 Slice::Gen::TypesVisitor::visitEnum(const EnumPtr& p)
 {
     string name = fixName(p);
-    EnumeratorList enumerators = p->getEnumerators();
+    EnumeratorList enumerators = p->enumerators();
+    string enumeratorPrefix = p->hasMetaData("objc:scoped") ? p->name() : "";
+
     _H << sp;
 
     //
@@ -1491,7 +1538,7 @@ Slice::Gen::TypesVisitor::visitEnum(const EnumPtr& p)
     EnumeratorList::const_iterator en = enumerators.begin();
     while(en != enumerators.end())
     {
-        _H << nl << fixName(*en);
+        _H << nl << moduleName(findModule(*en)) << enumeratorPrefix << (*en)->name();
         //
         // If any of the enumerators were assigned an explicit value, we emit
         // an explicit value for *all* enumerators.
@@ -1521,12 +1568,13 @@ Slice::Gen::TypesVisitor::visitConst(const ConstPtr& p)
         _H << nl << "static const " << typeToString(p->type());
     }
     _H << " " << fixName(p) << " = ";
-    writeConstantValue(_H, p->type(), p->value());
+    writeConstantValue(_H, p->type(), p->valueType(), p->value());
     _H << ';';
 }
 
 void
-Slice::Gen::TypesVisitor::writeConstantValue(IceUtilInternal::Output& out, const TypePtr& type, const string& val) const
+Slice::Gen::TypesVisitor::writeConstantValue(IceUtilInternal::Output& out, const TypePtr& type,
+                                             const SyntaxTreeBasePtr& valueType, const string& val) const
 {
     if(isString(type))
     {
@@ -1537,7 +1585,10 @@ Slice::Gen::TypesVisitor::writeConstantValue(IceUtilInternal::Output& out, const
         EnumPtr ep = EnumPtr::dynamicCast(type);
         if(ep)
         {
-            out  << moduleName(findModule(ep)) << val;
+            EnumeratorPtr lte = EnumeratorPtr::dynamicCast(valueType);
+            assert(lte);
+            string enumeratorPrefix = ep->hasMetaData("objc:scoped") ? ep->name() : "";
+            out << moduleName(findModule(ep)) << enumeratorPrefix << lte->name();
         }
         else
         {
@@ -1823,7 +1874,7 @@ Slice::Gen::TypesVisitor::writeMemberDefaultValueInit(const DataMemberList& data
                 _M << nl << "self->has_" << name << "__ = YES;";
             }
             _M << nl << "self->" << name << " = ";
-            writeConstantValue(_M, (*p)->type(), (*p)->defaultValue());
+            writeConstantValue(_M, (*p)->type(), (*p)->defaultValueType(), (*p)->defaultValue());
             _M << ";";
         }
         else
@@ -1837,7 +1888,7 @@ Slice::Gen::TypesVisitor::writeMemberDefaultValueInit(const DataMemberList& data
             EnumPtr en = EnumPtr::dynamicCast((*p)->type());
             if(en)
             {
-                string firstEnum = fixName(en->getEnumerators().front());
+                string firstEnum = fixName(en->enumerators().front());
                 _M << nl <<  "self->" << name << " = " << firstEnum << ';';
             }
 
@@ -1998,29 +2049,49 @@ Slice::Gen::TypesVisitor::writeMemberHashCode(const DataMemberList& dataMembers,
         TypePtr type = (*q)->type();
         string name = fixId((*q)->name(), baseType);
 
-        _M << nl << "h_ = ((h_ << 5) + h_) ^ ";
         if(isValueType(type))
         {
             BuiltinPtr builtin = BuiltinPtr::dynamicCast(type);
             if(builtin)
             {
-                if(builtin->kind() == Builtin::KindFloat || builtin->kind() == Builtin::KindDouble)
+                switch(builtin->kind())
                 {
-                    _M << "(2654435761u * (uint)" << name << ");";
-                }
-                else
-                {
-                    _M << "(2654435761u * " << name << ");";
+                    case Builtin::KindLong:
+                    {
+                        _M << nl << "h_ = ((h_ << 5) + h_) ^ (uint)(" << name << " ^ (" << name << " >> 32));";
+                        break;
+                    }
+                    case Builtin::KindFloat:
+                    {
+                        _M << sb;
+                        _M << nl << "uint32_t bits_ = *(uint32_t*)&" << name << ";";
+                        _M << nl << "h_ = ((h_ << 5) + h_) ^ (uint)bits_;";
+                        _M << eb;
+                        break;
+                    }
+                    case Builtin::KindDouble:
+                    {
+                        _M << sb;
+                        _M << nl << "uint64_t bits_ = *(uint64_t*)&" << name << ";";
+                        _M << nl << "h_ = ((h_ << 5) + h_) ^ (uint)(bits_ ^ (bits_ >> 32));";
+                        _M << eb;
+                        break;
+                    }
+                    default:
+                    {
+                        _M << nl << "h_ = ((h_ << 5) + h_) ^ (2654435761u * " << name << ");";
+                        break;
+                    }
                 }
             }
             else
             {
-                _M << name << ";";
+                 _M << nl << "h_ = ((h_ << 5) + h_) ^ " << name << ";";
             }
         }
         else
         {
-            _M << "[self->" << name << " hash];";
+            _M << nl << "h_ = ((h_ << 5) + h_) ^ [self->" << name << " hash];";
         }
     }
     _M << nl << "return h_;";
@@ -2222,33 +2293,35 @@ Slice::Gen::ProxyVisitor::visitOperation(const OperationPtr& p)
     string marshalParams = getMarshalParams(p);
     string unmarshalParams = getUnmarshalParams(p);
 
+    const string deprecateSymbol = getDeprecateSymbol(p, ClassDefPtr::dynamicCast(p->container()));
+
     //
     // Write two versions of the operation--with and without a
     // context parameter.
     //
-    _H << nl << "-(" << retString << ") " << name << params << ";";
+    _H << nl << "-(" << retString << ") " << name << params << deprecateSymbol << ";";
 
     _H << nl << "-(" << retString << ") " << name << params;
     if(!params.empty())
     {
         _H << " context";
     }
-    _H << ":(ICEContext *)" << getEscapedParamName(p, "context") << ";";
+    _H << ":(ICEContext *)" << getEscapedParamName(p, "context") << deprecateSymbol << ";";
 
-    _H << nl << "-(id<ICEAsyncResult>) begin_" << p->name() << marshalParams << ";";
+    _H << nl << "-(id<ICEAsyncResult>) begin_" << p->name() << marshalParams << deprecateSymbol << ";";
     _H << nl << "-(id<ICEAsyncResult>) begin_" << p->name() << marshalParams;
     if(!marshalParams.empty())
     {
         _H << " context";
     }
-    _H << ":(ICEContext *)" << getEscapedParamName(p, "context") << ";";
+    _H << ":(ICEContext *)" << getEscapedParamName(p, "context") << deprecateSymbol << ";";
 
     _H << nl << "-(" << retString << ") end_" << p->name() << unmarshalParams;
     if(!unmarshalParams.empty())
     {
         _H << " result";
     }
-    _H << ":(id<ICEAsyncResult>)" << getEscapedParamName(p, "result") << ";";
+    _H << ":(id<ICEAsyncResult>)" << getEscapedParamName(p, "result") << deprecateSymbol << ";";
 
     string responseExceptionDecl = ":(" + getResponseCBSig(p) + ")" + getEscapedParamName(p, "response") +
         " exception:(void(^)(ICEException*))" + getEscapedParamName(p, "exception");
@@ -2259,21 +2332,22 @@ Slice::Gen::ProxyVisitor::visitOperation(const OperationPtr& p)
     {
         _H << " response";
     }
-    _H << responseExceptionDecl << ";";
+    _H << responseExceptionDecl << deprecateSymbol << ";";
 
     _H << nl << "-(id<ICEAsyncResult>) begin_" << p->name() << marshalParams;
     if(!marshalParams.empty())
     {
         _H << " context";
     }
-    _H << ":(ICEContext *)" << getEscapedParamName(p, "context") << " response" << responseExceptionDecl << ";";
+    _H << ":(ICEContext *)" << getEscapedParamName(p, "context") << " response" << responseExceptionDecl
+       << deprecateSymbol << ";";
 
     _H << nl << "-(id<ICEAsyncResult>) begin_" << p->name() << marshalParams;
     if(!marshalParams.empty())
     {
         _H << " response";
     }
-    _H << responseExceptionSentDecl << ";";
+    _H << responseExceptionSentDecl << deprecateSymbol << ";";
 
     _H << nl << "-(id<ICEAsyncResult>) begin_" << p->name() << marshalParams;
     if(!marshalParams.empty())
@@ -2281,7 +2355,7 @@ Slice::Gen::ProxyVisitor::visitOperation(const OperationPtr& p)
         _H << " context";
     }
     _H << ":(ICEContext *)" << getEscapedParamName(p, "context");
-    _H << " response" << responseExceptionSentDecl << ";";
+    _H << " response" << responseExceptionSentDecl << deprecateSymbol << ";";
 }
 
 Slice::Gen::HelperVisitor::HelperVisitor(Output& H, Output& M, const string& dllExport) :

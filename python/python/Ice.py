@@ -1,6 +1,6 @@
 # **********************************************************************
 #
-# Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+# Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 #
 # This copy of Ice is licensed to you under the terms described in the
 # ICE_LICENSE file included in this distribution.
@@ -77,7 +77,7 @@ AsyncResult = IcePy.AsyncResult
 Unset = IcePy.Unset
 
 def Python35():
-    return sys.version_info[0] > 3 or (sys.version_info[0] == 3 and sys.version_info[1] >= 5)
+    return sys.version_info[:2] >= (3, 5)
 
 if Python35():
     from IceFuture import FutureBase, wrap_future
@@ -175,11 +175,11 @@ class Future(FutureBase):
 
         self._callCallbacks(callbacks)
 
+    @staticmethod
     def completed(result):
         f = Future()
         f.set_result(result)
         return f
-    completed = staticmethod(completed)
 
     def _wait(self, timeout, testFn=None):
         # Must be called with _condition acquired
@@ -226,7 +226,7 @@ class InvocationFuture(Future):
         with self._condition:
             return self._sent
 
-    def sent_synchronously(self):
+    def is_sent_synchronously(self):
         with self._condition:
             return self._sentSynchronously
 
@@ -291,6 +291,40 @@ _struct_marker = object()
 #
 # Core Ice types.
 #
+class Value(object):
+    def ice_id():
+        '''Obtains the type id corresponding to the most-derived Slice
+interface supported by the target object.
+Returns:
+    The type id.
+'''
+        return '::Ice::Object'
+
+    @staticmethod
+    def ice_staticId():
+        '''Obtains the type id of this Slice class or interface.
+Returns:
+    The type id.
+'''
+        return '::Ice::Object'
+
+    #
+    # Do not define these here. They will be invoked if defined by a subclass.
+    #
+    #def ice_preMarshal(self):
+    #    pass
+    #
+    #def ice_postUnmarshal(self):
+    #    pass
+
+class InterfaceByValue(Value):
+
+    def __init__(self, id):
+        self.id = id
+
+    def ice_id(self):
+        return self.id
+
 class Object(object):
     def ice_isA(self, id, current=None):
         '''Determines whether the target object supports the interface denoted
@@ -322,22 +356,13 @@ Returns:
 '''
         return '::Ice::Object'
 
+    @staticmethod
     def ice_staticId():
         '''Obtains the type id of this Slice class or interface.
 Returns:
     The type id.
 '''
         return '::Ice::Object'
-    ice_staticId = staticmethod(ice_staticId)
-
-    #
-    # Do not define these here. They will be invoked if defined by a subclass.
-    #
-    #def ice_preMarshal(self):
-    #    pass
-    #
-    #def ice_postUnmarshal(self):
-    #    pass
 
     def _iceDispatch(self, cb, method, args):
         # Invoke the given servant method. Exceptions can propagate to the caller.
@@ -511,7 +536,7 @@ class SliceInfo(object):
     # typeId - string
     # compactId - int
     # bytes - string
-    # objects - tuple of Ice.Object
+    # objects - tuple of Ice.Value
     pass
 
 #
@@ -526,7 +551,7 @@ class PropertiesAdminUpdateCallback(object):
     def updated(self, props):
         pass
 
-class UnknownSlicedObject(Object):
+class UnknownSlicedValue(Value):
     #
     # Members:
     #
@@ -658,6 +683,7 @@ FormatType.SlicedFormat = FormatType(2)
 # Forward declarations.
 #
 IcePy._t_Object = IcePy.declareClass('::Ice::Object')
+IcePy._t_Value = IcePy.declareValue('::Ice::Object')
 IcePy._t_ObjectPrx = IcePy.declareProxy('::Ice::Object')
 IcePy._t_LocalObject = IcePy.declareClass('::Ice::LocalObject')
 
@@ -812,6 +838,12 @@ class CommunicatorI(Communicator):
         self._impl = impl
         impl._setWrapper(self)
 
+    def __enter__(self):
+        return self
+
+    def __exit__(self, type, value, traceback):
+        self._impl.destroy()
+
     def destroy(self):
         self._impl.destroy()
 
@@ -906,14 +938,14 @@ class CommunicatorI(Communicator):
     def getPluginManager(self):
         raise RuntimeError("operation `getPluginManager' not implemented")
 
-    def flushBatchRequests(self):
-        self._impl.flushBatchRequests()
+    def flushBatchRequests(self, compress):
+        self._impl.flushBatchRequests(compress)
 
-    def flushBatchRequestsAsync(self):
-        return self._impl.flushBatchRequestsAsync()
+    def flushBatchRequestsAsync(self, compress):
+        return self._impl.flushBatchRequestsAsync(compress)
 
-    def begin_flushBatchRequests(self, _ex=None, _sent=None):
-        return self._impl.begin_flushBatchRequests(_ex, _sent)
+    def begin_flushBatchRequests(self, compress, _ex=None, _sent=None):
+        return self._impl.begin_flushBatchRequests(compress, _ex, _sent)
 
     def end_flushBatchRequests(self, r):
         return self._impl.end_flushBatchRequests(r)
@@ -1083,14 +1115,17 @@ class ObjectAdapterI(ObjectAdapter):
     def getLocator(self):
         return self._impl.getLocator()
 
-    def refreshPublishedEndpoints(self):
-        self._impl.refreshPublishedEndpoints()
-
     def getEndpoints(self):
         return self._impl.getEndpoints()
 
+    def refreshPublishedEndpoints(self):
+        self._impl.refreshPublishedEndpoints()
+
     def getPublishedEndpoints(self):
         return self._impl.getPublishedEndpoints()
+
+    def setPublishedEndpoints(self, newEndpoints):
+        self._impl.setPublishedEndpoints(newEndpoints)
 
 #
 # Logger wrapper.
@@ -1743,7 +1778,8 @@ signal, or False otherwise.'''
 #
 # Define Ice::Object and Ice::ObjectPrx.
 #
-IcePy._t_Object = IcePy.defineClass('::Ice::Object', Object, -1, (), False, False, None, (), ())
+IcePy._t_Object = IcePy.defineClass('::Ice::Object', Object, (), None, ())
+IcePy._t_Value = IcePy.defineValue('::Ice::Object', Value, -1, (), False, False, None, ())
 IcePy._t_ObjectPrx = IcePy.defineProxy('::Ice::Object', ObjectPrx)
 Object._ice_type = IcePy._t_Object
 
@@ -1752,10 +1788,10 @@ Object._op_ice_ping = IcePy.Operation('ice_ping', OperationMode.Idempotent, Oper
 Object._op_ice_ids = IcePy.Operation('ice_ids', OperationMode.Idempotent, OperationMode.Nonmutating, False, None, (), (), (), ((), _t_StringSeq, False, 0), ())
 Object._op_ice_id = IcePy.Operation('ice_id', OperationMode.Idempotent, OperationMode.Nonmutating, False, None, (), (), (), ((), IcePy._t_string, False, 0), ())
 
-IcePy._t_LocalObject = IcePy.defineClass('::Ice::LocalObject', object, -1, (), False, False, None, (), ())
+IcePy._t_LocalObject = IcePy.defineValue('::Ice::LocalObject', object, -1, (), False, False, None, ())
 
-IcePy._t_UnknownSlicedObject = IcePy.defineClass('::Ice::UnknownSlicedObject', UnknownSlicedObject, -1, (), False, True, None, (), ())
-UnknownSlicedObject._ice_type = IcePy._t_UnknownSlicedObject
+IcePy._t_UnknownSlicedValue = IcePy.defineValue('::Ice::UnknownSlicedValue', UnknownSlicedValue, -1, (), True, False, None, ())
+UnknownSlicedValue._ice_type = IcePy._t_UnknownSlicedValue
 
 #
 # Annotate some exceptions.

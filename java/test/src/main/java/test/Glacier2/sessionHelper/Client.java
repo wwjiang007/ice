@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -30,21 +30,16 @@ public class Client extends test.Util.Application
     }
 
     @Override
-    protected GetInitDataResult getInitData(String[] args)
+    protected com.zeroc.Ice.InitializationData getInitData(String[] args, java.util.List<String> rArgs)
     {
-        GetInitDataResult r = super.getInitData(args);
-        _initData = r.initData;
+        com.zeroc.Ice.InitializationData initData = super.getInitData(args, rArgs);
+        _initData = initData;
         _initData.properties.setProperty("Ice.Default.Router", "Glacier2/router:" +
                                          getTestEndpoint(_initData.properties, 10));
-        _initData.dispatcher = new com.zeroc.Ice.Dispatcher()
-            {
-                @Override
-                public void dispatch(Runnable runnable, com.zeroc.Ice.Connection connection)
-                {
-                    SwingUtilities.invokeLater(runnable);
-                }
-            };
-        return r;
+        _initData.dispatcher =
+            (Runnable runnable, com.zeroc.Ice.Connection c) -> {  SwingUtilities.invokeLater(runnable); };
+
+        return initData;
     }
 
     @Override
@@ -110,7 +105,7 @@ public class Client extends test.Util.Application
             {
                 try
                 {
-                    wait(2000);
+                    wait(30000);
                     break;
                 }
                 catch(java.lang.InterruptedException ex)
@@ -190,7 +185,7 @@ public class Client extends test.Util.Application
             {
                 try
                 {
-                    wait(2000);
+                    wait(30000);
                     break;
                 }
                 catch(java.lang.InterruptedException ex)
@@ -248,7 +243,7 @@ public class Client extends test.Util.Application
             {
                 try
                 {
-                    wait(2000);
+                    wait(30000);
                     break;
                 }
                 catch(java.lang.InterruptedException ex)

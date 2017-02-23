@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -391,7 +391,7 @@ getStackTrace(const vector<void*>& stackFrames)
                            "startHook",
                            &myModule);
         //
-        // If GetModuleHandleEx fails, myModule is NULL, i.e. we'll locate the current exe's directory.
+        // If GetModuleHandleEx fails, myModule is ICE_NULLPTR, i.e. we'll locate the current exe's directory.
         //
 
         TCHAR myFilename[MAX_PATH];

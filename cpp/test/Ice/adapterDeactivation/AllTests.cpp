@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -92,6 +92,9 @@ allTests(const CommunicatorPtr& communicator)
     cout << "testing whether server is gone... " << flush;
     try
     {
+#ifdef _WIN32
+        obj = obj->ice_timeout(100); // Workaround to speed up testing
+#endif
         obj->ice_ping();
         test(false);
     }

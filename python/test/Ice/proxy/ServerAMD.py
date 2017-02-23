@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # **********************************************************************
 #
-# Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+# Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 #
 # This copy of Ice is licensed to you under the terms described in the
 # ICE_LICENSE file included in this distribution.
@@ -19,7 +19,7 @@ if not slice_dir:
 Ice.loadSlice("'-I" + slice_dir + "' TestAMD.ice")
 import Test
 
-class MyDerivedClassI(Test.MyDerivedClass):
+class MyDerivedClassI(Test._MyDerivedClassDisp):
     def __init__(self):
         self.ctx = None
 
@@ -34,7 +34,7 @@ class MyDerivedClassI(Test.MyDerivedClass):
 
     def ice_isA(self, s, current):
         self.ctx = current.ctx
-        return Test.MyDerivedClass.ice_isA(self, s, current)
+        return Test._MyDerivedClassDisp.ice_isA(self, s, current)
 
 def run(args, communicator):
     communicator.getProperties().setProperty("TestAdapter.Endpoints", "default -p 12010:udp")
@@ -49,17 +49,10 @@ try:
     initData.properties = Ice.createProperties(sys.argv)
     initData.properties.setProperty("Ice.Warn.Connections", "0")
     initData.properties.setProperty("Ice.Warn.Dispatch", "0")
-    communicator = Ice.initialize(sys.argv, initData)
-    status = run(sys.argv, communicator)
+    with Ice.initialize(sys.argv, initData) as communicator:
+        status = run(sys.argv, communicator)
 except:
     traceback.print_exc()
     status = False
-
-if communicator:
-    try:
-        communicator.destroy()
-    except:
-        traceback.print_exc()
-        status = False
 
 sys.exit(not status)

@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -333,6 +333,9 @@ protected:
         OptionalReturnParam,
         OptionalMember
     };
+
+    std::string getWriteFunction(const std::string&, const TypePtr&);
+    std::string getReadFunction(const std::string&, const TypePtr&);
 
     void writeMarshalUnmarshalCode(::IceUtilInternal::Output&, const std::string&, const TypePtr&, OptionalMode,
                                    bool, int, const std::string&, bool, int&, const std::string& = "",

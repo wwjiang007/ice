@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -130,7 +130,7 @@ public class AllTests
             {
                 test(seq.length > 16384);
             }
-            obj.ice_getConnection().close(false);
+            obj.ice_getConnection().close(Ice.ConnectionClose.GracefullyWithWait);
             communicator.getProperties().setProperty("Ice.UDP.SndSize", "64000");
             seq = new byte[50000];
             try

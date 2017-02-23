@@ -1,6 +1,6 @@
 # **********************************************************************
 #
-# Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+# Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 #
 # This copy of Ice is licensed to you under the terms described in the
 # ICE_LICENSE file included in this distribution.
@@ -34,16 +34,9 @@ iphonesimulator_targetdir	= $(if $(filter %/build,$5),/iphonesimulator)
 # If building objects for a shared library, enable fPIC
 shared_cppflags	= $(if $(filter-out program,$($1_target)),-fPIC) -fvisibility=hidden
 
-CXXFLAGS	+= -Wall -Wdeprecated -Werror -pthread
-
+cppflags	= -Wall -Wdeprecated -Werror -pthread $(if $(filter yes,$(OPTIMIZE)),-O2 -DNDEBUG,-g)
 ifeq ($(MAXWARN),yes)
-    CXXFLAGS	+= -Wextra -Wshadow -Wredundant-decls -Wweak-vtables
-endif
-
-ifeq ($(OPTIMIZE),yes)
-    CXXFLAGS	+= -O2 -DNDEBUG
-else
-    CXXFLAGS	+= -g
+    cppflags	+= -Wextra -Wshadow -Wredundant-decls -Wweak-vtables
 endif
 
 nodeprecatedwarnings-cppflags := -Wno-deprecated-declarations

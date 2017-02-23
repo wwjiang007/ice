@@ -1,6 +1,6 @@
 # **********************************************************************
 #
-# Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+# Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 #
 # This copy of Ice is licensed to you under the terms described in the
 # ICE_LICENSE file included in this distribution.
@@ -902,7 +902,7 @@ def twowaysFuture(communicator, p):
     f = p.ice_pingAsync()
     test(f.result() is None)
 
-    f = p.ice_isAAsync(Test.MyClass.ice_staticId())
+    f = p.ice_isAAsync(Test._MyClassDisp.ice_staticId())
     test(f.result())
 
     f = p.ice_idAsync()
@@ -1244,7 +1244,7 @@ def twowaysFuture(communicator, p):
     test(c != ctx)
 
     test(len(p.ice_getContext()) == 0)
-    f = p.opContextAsync(_ctx=ctx)
+    f = p.opContextAsync(context=ctx)
     c = f.result()
     test(c == ctx)
 
@@ -1254,7 +1254,7 @@ def twowaysFuture(communicator, p):
     c = f.result()
     test(c == ctx)
 
-    f = p2.opContextAsync(_ctx=ctx)
+    f = p2.opContextAsync(context=ctx)
     c = f.result()
     test(c == ctx)
 

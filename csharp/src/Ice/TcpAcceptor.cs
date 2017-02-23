@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -20,7 +20,11 @@ namespace IceInternal
     {
         public virtual void close()
         {
-            Debug.Assert(_acceptFd == null);
+            if(_acceptFd != null)
+            {
+                Network.closeSocketNoThrow(_acceptFd);
+                _acceptFd = null;
+            }
             if(_fd != null)
             {
                 Network.closeSocketNoThrow(_fd);
@@ -136,7 +140,7 @@ namespace IceInternal
                 Network.setBlock(_fd, false);
                 Network.setTcpBufSize(_fd, _instance);
             }
-            catch(System.Exception)
+            catch(Exception)
             {
                 _fd = null;
                 throw;
@@ -147,7 +151,7 @@ namespace IceInternal
         private ProtocolInstance _instance;
         private Socket _fd;
         private Socket _acceptFd;
-        private System.Exception _acceptError;
+        private Exception _acceptError;
         private int _backlog;
         private IPEndPoint _addr;
         private IAsyncResult _result;

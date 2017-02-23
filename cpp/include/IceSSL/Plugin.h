@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -11,6 +11,7 @@
 #define ICE_SSL_PLUGIN_H
 
 #include <Ice/Plugin.h>
+#include <Ice/UniqueRef.h>
 #include <IceSSL/Config.h>
 #include <IceSSL/ConnectionInfo.h>
 
@@ -172,8 +173,9 @@ public:
 
     PublicKey(const CertificatePtr&, KeyRef);
 
+#ifdef ICE_USE_OPENSSL
     ~PublicKey();
-
+#endif
     //
     // Retrieve the native public key value wrapped by this object.
     //
@@ -188,7 +190,11 @@ private:
     friend class Certificate;
 
     CertificatePtr _cert;
+#ifdef __APPLE__
+    IceInternal::UniqueRef<KeyRef> _key;
+#else
     KeyRef _key;
+#endif
 
 };
 ICE_DEFINE_PTR(PublicKeyPtr, PublicKey);
@@ -330,6 +336,16 @@ public:
     //
     bool operator==(const Certificate&) const;
     bool operator!=(const Certificate&) const;
+    
+    //
+    // Authority key identifier
+    //
+    std::vector<Ice::Byte> getAuthorityKeyIdentifier() const;
+
+    //
+    // Subject key identifier
+    //
+    std::vector<Ice::Byte> getSubjectKeyIdentifier() const;
 
     //
     // Get the certificate's public key.
@@ -485,15 +501,20 @@ public:
 
 private:
 
+#if defined(__APPLE__)
+    IceInternal::UniqueRef<X509CertificateRef> _cert;
+#else
     X509CertificateRef _cert;
+#endif
 
 #ifdef ICE_USE_SCHANNEL
     CERT_INFO* _certInfo;
 #endif
+
 #if defined(__APPLE__) && TARGET_OS_IPHONE != 0
     void initializeAttributes() const;
-    mutable CFDataRef _subject;
-    mutable CFDataRef _issuer;
+    mutable IceInternal::UniqueRef<CFDataRef> _subject;
+    mutable IceInternal::UniqueRef<CFDataRef> _issuer;
     mutable std::string _serial;
     mutable int _version;
 #endif

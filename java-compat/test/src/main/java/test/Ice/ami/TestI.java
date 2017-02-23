@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -10,6 +10,8 @@
 package test.Ice.ami;
 
 import test.Ice.ami.Test._TestIntfDisp;
+import test.Ice.ami.Test.AMD_TestIntf_startDispatch;
+import test.Ice.ami.Test.CloseMode;
 import test.Ice.ami.Test.TestIntfException;
 
 public class TestI extends _TestIntfDisp
@@ -58,6 +60,12 @@ public class TestI extends _TestIntfDisp
     opBatchCount(Ice.Current current)
     {
         return _batchCount;
+    }
+
+    @Override
+    public boolean supportsAMD(Ice.Current current)
+    {
+        return true;
     }
 
     @Override
@@ -129,17 +137,56 @@ public class TestI extends _TestIntfDisp
 
     @Override
     public void
-    close(boolean force, Ice.Current current)
+    close(CloseMode mode, Ice.Current current)
     {
-        current.con.close(force);
+        current.con.close(Ice.ConnectionClose.valueOf(mode.value()));
     }
 
     @Override
     public void
+    sleep(int ms, Ice.Current current)
+    {
+        try
+        {
+            Thread.sleep(ms);
+        }
+        catch(InterruptedException ex)
+        {
+        }
+    }
+
+    @Override
+    public synchronized void
+    startDispatch_async(AMD_TestIntf_startDispatch cb, Ice.Current current)
+    {
+        _pending.add(cb);
+    }
+
+    @Override
+    public synchronized void
+    finishDispatch(Ice.Current current)
+    {
+        for(AMD_TestIntf_startDispatch cb : _pending)
+        {
+            cb.ice_response();
+        }
+        _pending.clear();
+    }
+
+    @Override
+    public synchronized void
     shutdown(Ice.Current current)
     {
+        //
+        // Just in case a request arrived late.
+        //
+        for(AMD_TestIntf_startDispatch cb : _pending)
+        {
+            cb.ice_response();
+        }
         current.adapter.getCommunicator().shutdown();
     }
 
     private int _batchCount;
+    private java.util.List<AMD_TestIntf_startDispatch> _pending = new java.util.LinkedList<>();
 }

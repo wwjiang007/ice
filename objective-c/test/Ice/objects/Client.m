@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -13,6 +13,11 @@
 
 #if !TARGET_OS_IPHONE
 #   import <Foundation/NSGarbageCollector.h>
+#endif
+
+#if defined(__clang__)
+// For 'Ice::Communicator::addObjectFactory()' deprecation
+#   pragma clang diagnostic ignored "-Wdeprecated-declarations"
 #endif
 
 // Note that the factory must not autorelease the
@@ -138,15 +143,7 @@ main(int argc, char* argv[])
 
         if(communicator)
         {
-            @try
-            {
-                [communicator destroy];
-            }
-            @catch(ICEException* ex)
-            {
-                tprintf("%@\n", ex);
-                status = EXIT_FAILURE;
-            }
+            [communicator destroy];
         }
     }
     return status;

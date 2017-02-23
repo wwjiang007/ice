@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -459,14 +459,7 @@ SessionHelperI::destroyInternal(const Ice::DispatcherCallPtr& disconnected)
 
     if(communicator)
     {
-        try
-        {
-            communicator->destroy();
-        }
-        catch(...)
-        {
-        }
-        communicator = ICE_NULLPTR;
+        communicator->destroy();
     }
     dispatchCallback(disconnected, ICE_NULLPTR);
 }
@@ -482,14 +475,7 @@ SessionHelperI::destroyCommunicator()
 
     if(communicator)
     {
-        try
-        {
-            communicator->destroy();
-        }
-        catch(...)
-        {
-        }
-        communicator = ICE_NULLPTR;
+        communicator->destroy();
     }
 }
 
@@ -504,13 +490,7 @@ SessionHelperI::connectFailed()
 
     if(communicator)
     {
-        try
-        {
-            communicator->destroy();
-        }
-        catch(...)
-        {
-        }
+        communicator->destroy();
     }
 }
 
@@ -541,7 +521,7 @@ private:
 
     const Glacier2::SessionCallbackPtr _callback;
     const Glacier2::SessionHelperPtr _session;
-    IceUtil::UniquePtr<Ice::Exception> _ex;
+    IceInternal::UniquePtr<Ice::Exception> _ex;
 };
 
 class CreatedCommunicator : public Ice::DispatcherCall
@@ -808,7 +788,7 @@ SessionHelperI::connected(const Glacier2::RouterPrxPtr& router, const Glacier2::
             {
                 Ice::ConnectionPtr connection = _router->ice_getCachedConnection();
                 assert(connection);
-                connection->setACM(acmTimeout, IceUtil::None, Ice::HeartbeatAlways);
+                connection->setACM(acmTimeout, IceUtil::None, Ice::ICE_ENUM(ACMHeartbeat, HeartbeatAlways));
 #ifdef ICE_CPP11_MAPPING
                 auto self = shared_from_this();
                 connection->setCloseCallback([self](Ice::ConnectionPtr)

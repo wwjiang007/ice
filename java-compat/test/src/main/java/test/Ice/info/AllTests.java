@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -123,6 +123,12 @@ public class AllTests
             test(udpEndpoint.datagram());
             test(udpEndpoint.port > 0);
 
+            endpoints = new Ice.Endpoint[]{endpoints[0]};
+            test(endpoints.length == 1);
+            adapter.setPublishedEndpoints(endpoints);
+            publishedEndpoints = adapter.getPublishedEndpoints();
+            test(java.util.Arrays.equals(endpoints, publishedEndpoints));
+
             adapter.destroy();
 
             int port = app.getTestPort(1);
@@ -195,6 +201,12 @@ public class AllTests
             }
             test(info.rcvSize >= 1024);
             test(info.sndSize >= 2048);
+
+            //
+            // Make sure the local slice class is cloneable
+            //
+            java.lang.Cloneable cloneable = info;
+            Ice.TCPConnectionInfo info2 = (Ice.TCPConnectionInfo)info.clone();
 
             java.util.Map<String, String> ctx = testIntf.getConnectionInfoAsContext();
             test(ctx.get("incoming").equals("true"));

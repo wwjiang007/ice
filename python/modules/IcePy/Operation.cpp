@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -2923,10 +2923,7 @@ IcePy::SyncBlobjectInvocation::invoke(PyObject* args, PyObject* /* kwds */)
             throwPythonException();
         }
 
-        if(PyTuple_SET_ITEM(result.get(), 0, ok ? incTrue() : incFalse()) < 0)
-        {
-            throwPythonException();
-        }
+        PyTuple_SET_ITEM(result.get(), 0, ok ? incTrue() : incFalse());
 
 #if PY_VERSION_HEX >= 0x03000000
         PyObjectHandle op;
@@ -3004,7 +3001,7 @@ IcePy::AsyncBlobjectInvocation::invoke(PyObject* args, PyObject* kwds)
         const_cast<char*>("_response"),
         const_cast<char*>("_ex"),
         const_cast<char*>("_sent"),
-        const_cast<char*>("_ctx"),
+        const_cast<char*>("context"),
         0
     };
     char* operation;
@@ -3196,10 +3193,7 @@ IcePy::AsyncBlobjectInvocation::end(const Ice::ObjectPrx& proxy, const Ice::Asyn
             return 0;
         }
 
-        if(PyTuple_SET_ITEM(args.get(), 0, ok ? incTrue() : incFalse()) < 0)
-        {
-            return 0;
-        }
+        PyTuple_SET_ITEM(args.get(), 0, ok ? incTrue() : incFalse());
 
 #if PY_VERSION_HEX >= 0x03000000
         Py_ssize_t sz = results.second - results.first;
@@ -3275,12 +3269,7 @@ IcePy::AsyncBlobjectInvocation::response(bool ok, const pair<const Ice::Byte*, c
             return;
         }
 
-        if(PyTuple_SET_ITEM(args.get(), 0, ok ? incTrue() : incFalse()) < 0)
-        {
-            assert(PyErr_Occurred());
-            PyErr_Print();
-            return;
-        }
+        PyTuple_SET_ITEM(args.get(), 0, ok ? incTrue() : incFalse());
 
 #if PY_VERSION_HEX >= 0x03000000
         Py_ssize_t sz = results.second - results.first;
@@ -3458,12 +3447,7 @@ IcePy::NewAsyncBlobjectInvocation::handleResponse(PyObject* future, bool ok,
         return;
     }
 
-    if(PyTuple_SET_ITEM(args.get(), 0, ok ? incTrue() : incFalse()) < 0)
-    {
-        assert(PyErr_Occurred());
-        PyErr_Print();
-        return;
-    }
+    PyTuple_SET_ITEM(args.get(), 0, ok ? incTrue() : incFalse());
 
 #if PY_VERSION_HEX >= 0x03000000
     Py_ssize_t sz = results.second - results.first;

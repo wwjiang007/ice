@@ -1,6 +1,6 @@
 # **********************************************************************
 #
-# Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+# Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 #
 # This copy of Ice is licensed to you under the terms described in the
 # ICE_LICENSE file included in this distribution.
@@ -103,7 +103,7 @@ def twoways(communicator, p):
     #
     # ice_isA
     #
-    test(p.ice_isA(Test.MyClass.ice_staticId()))
+    test(p.ice_isA(Test._MyClassDisp.ice_staticId()))
 
     #
     # ice_ids
@@ -117,13 +117,13 @@ def twoways(communicator, p):
     #
     # ice_id
     #
-    test(p.ice_id() == Test.MyDerivedClass.ice_staticId())
+    test(p.ice_id() == Test._MyDerivedClassDisp.ice_staticId())
 
     #
     # Prx ice_staticId
     #
-    test(Test.MyClassPrx.ice_staticId() == Test.MyClass.ice_staticId())
-    test(Test.MyDerivedClassPrx.ice_staticId() == Test.MyDerivedClass.ice_staticId())
+    test(Test.MyClassPrx.ice_staticId() == Test._MyClassDisp.ice_staticId())
+    test(Test.MyDerivedClassPrx.ice_staticId() == Test._MyDerivedClassDisp.ice_staticId())
     test(Ice.ObjectPrx.ice_staticId() == Ice.Object.ice_staticId())
 
     #

@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -797,10 +797,17 @@ Slice::JavaCompatVisitor::writeMarshalUnmarshalParams(Output& out, const string&
 }
 
 void
-Slice::JavaCompatVisitor::writeThrowsClause(const string& package, const ExceptionList& throws)
+Slice::JavaCompatVisitor::writeThrowsClause(const string& package, const ExceptionList& throws, const OperationPtr& op)
 {
     Output& out = output();
-    if(throws.size() > 0)
+
+    if(op && (op->hasMetaData("java:UserException") || op->hasMetaData("UserException")))
+    {
+        out.inc();
+        out << nl << "throws Ice.UserException";
+        out.dec();
+    }
+    else if(throws.size() > 0)
     {
         out.inc();
         out << nl << "throws ";
@@ -1224,16 +1231,8 @@ Slice::JavaCompatVisitor::writeDispatchAndMarshalling(Output& out, const ClassDe
                 << typeToString(ret, TypeModeReturn, package, op->getMetaData(), true,
                                 optionalMapping && op->returnIsOptional())
                 << ' ' << opName << spar << params << epar;
-            if(op->hasMetaData("UserException"))
-            {
-                out.inc();
-                out << nl << "throws Ice.UserException";
-                out.dec();
-            }
-            else
-            {
-                writeThrowsClause(package, throws);
-            }
+            writeThrowsClause(package, throws, op);
+
             out << sb << nl;
             if(ret)
             {
@@ -1765,7 +1764,6 @@ Slice::JavaCompatVisitor::writeConstantValue(Output& out, const TypePtr& type, c
     else
     {
         BuiltinPtr bp;
-        EnumPtr ep;
         if((bp = BuiltinPtr::dynamicCast(type)))
         {
             switch(bp->kind())
@@ -1810,15 +1808,11 @@ Slice::JavaCompatVisitor::writeConstantValue(Output& out, const TypePtr& type, c
             }
 
         }
-        else if((ep = EnumPtr::dynamicCast(type)))
+        else if(EnumPtr::dynamicCast(type))
         {
-            string val = value;
-            string::size_type pos = val.rfind(':');
-            if(pos != string::npos)
-            {
-                val.erase(0, pos + 1);
-            }
-            out << getAbsolute(ep, package) << '.' << fixKwd(val);
+            EnumeratorPtr lte = EnumeratorPtr::dynamicCast(valueType);
+            assert(lte);
+            out << getAbsolute(lte, package);
         }
         else
         {
@@ -1845,7 +1839,7 @@ Slice::JavaCompatVisitor::writeDataMemberInitializers(Output& out, const DataMem
             }
             else
             {
-                out << nl << fixKwd((*p)->name()) << " = ";
+                out << nl << "this." << fixKwd((*p)->name()) << " = ";
                 writeConstantValue(out, t, (*p)->defaultValueType(), (*p)->defaultValue(), package);
                 out << ';';
             }
@@ -1855,21 +1849,21 @@ Slice::JavaCompatVisitor::writeDataMemberInitializers(Output& out, const DataMem
             BuiltinPtr builtin = BuiltinPtr::dynamicCast(t);
             if(builtin && builtin->kind() == Builtin::KindString)
             {
-                out << nl << fixKwd((*p)->name()) << " = \"\";";
+                out << nl << "this." << fixKwd((*p)->name()) << " = \"\";";
             }
 
             EnumPtr en = EnumPtr::dynamicCast(t);
             if(en)
             {
-                string firstEnum = fixKwd(en->getEnumerators().front()->name());
-                out << nl << fixKwd((*p)->name()) << " = " << getAbsolute(en, package) << '.' << firstEnum << ';';
+                string firstEnum = fixKwd(en->enumerators().front()->name());
+                out << nl << "this." << fixKwd((*p)->name()) << " = " << getAbsolute(en, package) << '.' << firstEnum << ';';
             }
 
             StructPtr st = StructPtr::dynamicCast(t);
             if(st)
             {
                 string memberType = typeToString(st, TypeModeMember, package, (*p)->getMetaData());
-                out << nl << fixKwd((*p)->name()) << " = new " << memberType << "();";
+                out << nl << "this." << fixKwd((*p)->name()) << " = new " << memberType << "();";
             }
         }
     }
@@ -2279,7 +2273,8 @@ Slice::JavaCompatVisitor::writeDocCommentParam(Output& out, const OperationPtr& 
     }
 }
 
-Slice::GenCompat::GenCompat(const string& /*name*/, const string& base, const vector<string>& includePaths, const string& dir, bool tie) :
+Slice::GenCompat::GenCompat(const string& /*name*/, const string& base, const vector<string>& includePaths,
+                            const string& dir, bool tie) :
     _base(base),
     _includePaths(includePaths),
     _dir(dir),
@@ -2519,16 +2514,7 @@ Slice::GenCompat::OpsVisitor::writeOperations(const ClassDefPtr& p, bool noCurre
             out << "Ice.Current " + currentParamName;
         }
         out << epar;
-        if(op->hasMetaData("UserException"))
-        {
-            out.inc();
-            out << nl << "throws Ice.UserException";
-            out.dec();
-        }
-        else
-        {
-            writeThrowsClause(package, throws);
-        }
+        writeThrowsClause(package, throws, op);
         out << ';';
     }
 
@@ -2588,6 +2574,20 @@ Slice::GenCompat::TypesVisitor::visitClassDefStart(const ClassDefPtr& p)
     Output& out = output();
 
     //
+    // Check for java:implements metadata.
+    //
+    const StringList metaData = p->getMetaData();
+    static const string prefix = "java:implements:";
+    StringList implements;
+    for(StringList::const_iterator q = metaData.begin(); q != metaData.end(); ++q)
+    {
+        if(q->find(prefix) == 0)
+        {
+            implements.push_back(q->substr(prefix.size()));
+        }
+    }
+
+    //
     // Slice interfaces map to Java interfaces.
     //
     out << sp;
@@ -2595,108 +2595,91 @@ Slice::GenCompat::TypesVisitor::visitClassDefStart(const ClassDefPtr& p)
     if(p->isInterface())
     {
         out << nl << "public interface " << fixKwd(name);
-        if(!p->isLocal())
+        ClassList::const_iterator q = bases.begin();
+        StringList::const_iterator r = implements.begin();
+        if(!p->isLocal() || !bases.empty() || !implements.empty())
         {
             out << " extends ";
-            out.useCurrentPosAsIndent();
-            out << "Ice.Object";
-            out << "," << nl << '_' << name;
-            out << "Operations, _" << name << "OperationsNC";
         }
-        else
+        out.useCurrentPosAsIndent();
+        if(!p->isLocal())
         {
-            if(!bases.empty())
+            out << '_' << name << "Operations, _" << name << "OperationsNC";
+            if(bases.empty())
             {
-                out << " extends ";
+                out << "," << nl << "Ice.Object";
             }
-            out.useCurrentPosAsIndent();
         }
-
-        ClassList::const_iterator q = bases.begin();
-        if(p->isLocal() && q != bases.end())
+        else if(q != bases.end())
         {
             out << getAbsolute(*q++, package);
         }
-        while(q != bases.end())
+        else if(r != implements.end())
+        {
+            out << *r++;
+        }
+
+        for(;q != bases.end(); ++q)
         {
             out << ',' << nl << getAbsolute(*q, package);
-            q++;
+        }
+        for(; r != implements.end(); ++r)
+        {
+            out << ',' << nl << *r;
         }
         out.restoreIndent();
     }
     else
     {
         out << nl << "public ";
-        if(p->allOperations().size() > 0) // Don't use isAbstract() - see bug 3739
+        if(p->allOperations().size() > 0 || !implements.empty()) // Don't use isAbstract() - see bug 3739
         {
             out << "abstract ";
         }
         out << "class " << fixKwd(name);
         out.useCurrentPosAsIndent();
 
-        StringList implements;
-        bool implementsOnNewLine = true;
-
-        if(bases.empty() || bases.front()->isInterface())
+        if(baseClass)
         {
-            if(p->isLocal())
-            {
-                implementsOnNewLine = false;
-                implements.push_back("java.lang.Cloneable");
-            }
-            else
-            {
-                out << " extends Ice.ObjectImpl";
-            }
+            out << " extends " << getAbsolute(baseClass, package);
+            bases.pop_front();
+        }
+        else if(!p->isLocal())
+        {
+            out << " extends Ice.ObjectImpl";
         }
         else
         {
-            out << " extends ";
-            out << getAbsolute(baseClass, package);
-            bases.pop_front();
+            implements.push_back("java.lang.Cloneable");
         }
 
-        //
-        // Implement interfaces
-        //
-
-        if(p->isAbstract())
+        if(p->isAbstract() && !p->isLocal())
         {
-            if(!p->isLocal())
-            {
-                implements.push_back("_" + name + "Operations");
-                implements.push_back("_" + name + "OperationsNC");
-            }
+            implements.push_back("_" + name + "Operations");
+            implements.push_back("_" + name + "OperationsNC");
         }
-        if(!bases.empty())
+        for(ClassList::const_iterator q = bases.begin(); q != bases.end(); ++q)
         {
-            for(ClassList::const_iterator q = bases.begin(); q != bases.end();)
-            {
-                implements.push_back(getAbsolute(*q, package));
-                q++;
-            }
+            implements.push_back(getAbsolute(*q, package));
         }
 
         if(!implements.empty())
         {
-            if(implementsOnNewLine)
+            if(baseClass || !p->isLocal())
             {
                 out << nl;
             }
 
             out << " implements ";
             out.useCurrentPosAsIndent();
-
-            for(StringList::const_iterator q = implements.begin(); q != implements.end();)
+            for(StringList::const_iterator q = implements.begin(); q != implements.end(); ++q)
             {
                 if(q != implements.begin())
                 {
                     out << ',' << nl;
                 }
                 out << *q;
-                q++;
             }
-
             out.restoreIndent();
         }
 
@@ -2738,16 +2721,8 @@ Slice::GenCompat::TypesVisitor::visitClassDefStart(const ClassDefPtr& p)
                 out << "public abstract ";
             }
             out << retS << ' ' << fixKwd(opname) << spar << params << epar;
-            if(op->hasMetaData("UserException"))
-            {
-                out.inc();
-                out << nl << "throws Ice.UserException";
-                out.dec();
-            }
-            else
-            {
-                writeThrowsClause(package, throws);
-            }
+            writeThrowsClause(package, throws, op);
+
             out << ';';
 
             //
@@ -3032,12 +3007,15 @@ Slice::GenCompat::TypesVisitor::visitClassDefEnd(const ClassDefPtr& p)
     string serialVersionUID;
     if(p->findMetaData("java:serialVersionUID", serialVersionUID))
     {
+        const UnitPtr unit = p->unit();
+        const DefinitionContextPtr dc = unit->findDefinitionContext(p->file());
+        assert(dc);
         string::size_type pos = serialVersionUID.rfind(":") + 1;
         if(pos == string::npos)
         {
             ostringstream os;
             os << "ignoring invalid serialVersionUID for class `" << p->scoped() << "'; generating default value";
-            emitWarning("", "", os.str());
+            dc->warning(InvalidMetaData, "", "", os.str());
             out << computeSerialVersionUUID(p);
         }
         else
@@ -3051,7 +3029,7 @@ Slice::GenCompat::TypesVisitor::visitClassDefEnd(const ClassDefPtr& p)
                     ostringstream os;
                     os << "ignoring invalid serialVersionUID for class `" << p->scoped()
                        << "'; generating default value";
-                    emitWarning("", "", os.str());
+                    dc->warning(InvalidMetaData, "", "", os.str());
                     out << computeSerialVersionUUID(p);
                 }
             }
@@ -3452,12 +3430,15 @@ Slice::GenCompat::TypesVisitor::visitExceptionEnd(const ExceptionPtr& p)
     string serialVersionUID;
     if(p->findMetaData("java:serialVersionUID", serialVersionUID))
     {
+        const UnitPtr unit = p->unit();
+        const DefinitionContextPtr dc = unit->findDefinitionContext(p->file());
+        assert(dc);
         string::size_type pos = serialVersionUID.rfind(":") + 1;
         if(pos == string::npos)
         {
             ostringstream os;
             os << "ignoring invalid serialVersionUID for exception `" << p->scoped() << "'; generating default value";
-            emitWarning("", "", os.str());
+            dc->warning(InvalidMetaData, "", "", os.str());
             out << computeSerialVersionUUID(p);
         }
         else
@@ -3471,7 +3452,7 @@ Slice::GenCompat::TypesVisitor::visitExceptionEnd(const ExceptionPtr& p)
                     ostringstream os;
                     os << "ignoring invalid serialVersionUID for exception `" << p->scoped()
                        << "'; generating default value";
-                    emitWarning("", "", os.str());
+                    dc->warning(InvalidMetaData, "", "", os.str());
                     out << computeSerialVersionUUID(p);
                 }
             }
@@ -3498,15 +3479,37 @@ Slice::GenCompat::TypesVisitor::visitStructStart(const StructPtr& p)
 
     Output& out = output();
 
+    //
+    // Check for java:implements metadata.
+    //
+    const StringList metaData = p->getMetaData();
+    static const string prefix = "java:implements:";
+    StringList implements;
+    for(StringList::const_iterator q = metaData.begin(); q != metaData.end(); ++q)
+    {
+        if(q->find(prefix) == 0)
+        {
+            implements.push_back(q->substr(prefix.size()));
+        }
+    }
+
     out << sp;
 
     writeDocComment(out, p, getDeprecateReason(p, 0, "type"));
 
-    out << nl << "public class " << name << " implements java.lang.Cloneable";
+    out << nl << "public class " << name << " implements ";
+    out.useCurrentPosAsIndent();
+    out << "java.lang.Cloneable";
     if(!p->isLocal())
     {
-        out << ", java.io.Serializable";
+        out << "," << nl << "java.io.Serializable";
     }
+    for(StringList::const_iterator q = implements.begin(); q != implements.end(); ++q)
+    {
+        out << "," << nl << *q;
+    }
+    out.restoreIndent();
+
     out << sb;
 
     return true;
@@ -3729,12 +3732,9 @@ Slice::GenCompat::TypesVisitor::visitStructEnd(const StructPtr& p)
         out << eb;
         out << eb;
 
-        out << sp << nl << "static public " << name << nl << "ice_read(Ice.InputStream istr, " << name << " v)";
+        out << sp << nl << "static public " << name << nl << "ice_read(Ice.InputStream istr)";
         out << sb;
-        out << nl << "if(v == null)";
-        out << sb;
-        out << nl << " v = new " << name << "();";
-        out << eb;
+        out << nl << name << " v = new " << name << "();";
         out << nl << "v.ice_readMembers(istr);";
         out << nl << "return v;";
         out << eb;
@@ -3746,12 +3746,15 @@ Slice::GenCompat::TypesVisitor::visitStructEnd(const StructPtr& p)
     string serialVersionUID;
     if(p->findMetaData("java:serialVersionUID", serialVersionUID))
     {
+        const UnitPtr unit = p->unit();
+        const DefinitionContextPtr dc = unit->findDefinitionContext(p->file());
+        assert(dc);
         string::size_type pos = serialVersionUID.rfind(":") + 1;
         if(pos == string::npos)
         {
             ostringstream os;
             os << "ignoring invalid serialVersionUID for struct `" << p->scoped() << "'; generating default value";
-            emitWarning("", "", os.str());
+            dc->warning(InvalidMetaData, "", "", os.str());
             out << computeSerialVersionUUID(p);
         }
         else
@@ -3765,7 +3768,7 @@ Slice::GenCompat::TypesVisitor::visitStructEnd(const StructPtr& p)
                     ostringstream os;
                     os << "ignoring invalid serialVersionUID for struct `" << p->scoped()
                        << "'; generating default value";
-                    emitWarning("", "", os.str());
+                    dc->warning(InvalidMetaData, "", "", os.str());
                     out << computeSerialVersionUUID(p);
                 }
             }
@@ -4047,7 +4050,7 @@ Slice::GenCompat::TypesVisitor::visitEnum(const EnumPtr& p)
 {
     string name = fixKwd(p->name());
     string absolute = getAbsolute(p);
-    EnumeratorList enumerators = p->getEnumerators();
+    EnumeratorList enumerators = p->enumerators();
 
     open(absolute, p->file());
 
@@ -5796,19 +5799,11 @@ Slice::GenCompat::DispatcherVisitor::visitClassDefStart(const ClassDefPtr& p)
             }
             out << epar;
 
-            if((*r)->hasMetaData("UserException"))
-            {
-                out.inc();
-                out << nl << "throws Ice.UserException";
-                out.dec();
-            }
-            else
-            {
-                ExceptionList throws = (*r)->throws();
-                throws.sort();
-                throws.unique();
-                writeThrowsClause(package, throws);
-            }
+            ExceptionList throws = (*r)->throws();
+            throws.sort();
+            throws.unique();
+            writeThrowsClause(package, throws, *r);
+
             out << sb;
             out << nl;
             if(ret && !hasAMD)
@@ -5829,12 +5824,15 @@ Slice::GenCompat::DispatcherVisitor::visitClassDefStart(const ClassDefPtr& p)
         string serialVersionUID;
         if(p->findMetaData("java:serialVersionUID", serialVersionUID))
         {
+            const UnitPtr unit = p->unit();
+            const DefinitionContextPtr dc = unit->findDefinitionContext(p->file());
+            assert(dc);
             string::size_type pos = serialVersionUID.rfind(":") + 1;
             if(pos == string::npos)
             {
                 ostringstream os;
                 os << "ignoring invalid serialVersionUID for class `" << p->scoped() << "'; generating default value";
-                emitWarning("", "", os.str());
+                dc->warning(InvalidMetaData, "", "", os.str());
                 out << computeSerialVersionUUID(p);
             }
             else
@@ -5848,7 +5846,7 @@ Slice::GenCompat::DispatcherVisitor::visitClassDefStart(const ClassDefPtr& p)
                         ostringstream os;
                         os << "ignoring invalid serialVersionUID for class `" << p->scoped()
                            << "'; generating default value";
-                        emitWarning("", "", os.str());
+                        dc->warning(InvalidMetaData, "", "", os.str());
                         out << computeSerialVersionUUID(p);
                     }
                 }
@@ -5941,7 +5939,7 @@ Slice::GenCompat::BaseImplVisitor::writeDecl(Output& out, const string& package,
             EnumPtr en = EnumPtr::dynamicCast(type);
             if(en)
             {
-                EnumeratorList enumerators = en->getEnumerators();
+                EnumeratorList enumerators = en->enumerators();
                 out << " = " << getAbsolute(en, package) << '.' << fixKwd(enumerators.front()->name());
             }
             else
@@ -6054,7 +6052,7 @@ Slice::GenCompat::BaseImplVisitor::writeOperation(Output& out, const string& pac
 #else
         throws.sort(Slice::DerivedToBaseCompare());
 #endif
-        writeThrowsClause(package, throws);
+        writeThrowsClause(package, throws, op);
 
         out << sb;
 
@@ -6116,17 +6114,7 @@ Slice::GenCompat::BaseImplVisitor::writeOperation(Output& out, const string& pac
         ExceptionList throws = op->throws();
         throws.sort();
         throws.unique();
-
-        if(op->hasMetaData("UserException"))
-        {
-            out.inc();
-            out << nl << "throws Ice.UserException";
-            out.dec();
-        }
-        else
-        {
-            writeThrowsClause(package, throws);
-        }
+        writeThrowsClause(package, throws, op);
 
         out << sb;
 

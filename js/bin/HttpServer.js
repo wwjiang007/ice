@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -188,6 +188,10 @@ function Init()
                     if(f.indexOf("/") === -1)
                     {
                         return "/test/" + matchController[1] + "/" + f;
+                    }
+                    else if(f.indexOf("/lib") === 0 && es5)
+                    {
+                        return f.replace("/lib", "/lib/es5");
                     }
                     else
                     {

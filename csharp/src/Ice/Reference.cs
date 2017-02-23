@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -92,7 +92,7 @@ namespace IceInternal
         public abstract bool getPreferSecure();
         public abstract Ice.EndpointSelectionType getEndpointSelection();
         public abstract int getLocatorCacheTimeout();
-        public abstract String getConnectionId();
+        public abstract string getConnectionId();
 
         //
         // The change* methods (here and in derived classes) create
@@ -218,23 +218,42 @@ namespace IceInternal
                     return hashValue_;
                 }
                 int h = 5381;
-                IceInternal.HashUtil.hashAdd(ref h, _mode);
-                IceInternal.HashUtil.hashAdd(ref h, secure_);
-                IceInternal.HashUtil.hashAdd(ref h, _identity);
-                IceInternal.HashUtil.hashAdd(ref h, _context);
-                IceInternal.HashUtil.hashAdd(ref h, _facet);
-                IceInternal.HashUtil.hashAdd(ref h, overrideCompress_);
+                HashUtil.hashAdd(ref h, _mode);
+                HashUtil.hashAdd(ref h, secure_);
+                HashUtil.hashAdd(ref h, _identity);
+                HashUtil.hashAdd(ref h, _context);
+                HashUtil.hashAdd(ref h, _facet);
+                HashUtil.hashAdd(ref h, overrideCompress_);
                 if(overrideCompress_)
                 {
-                    IceInternal.HashUtil.hashAdd(ref h, compress_);
+                    HashUtil.hashAdd(ref h, compress_);
                 }
-                IceInternal.HashUtil.hashAdd(ref h, _protocol);
-                IceInternal.HashUtil.hashAdd(ref h, _encoding);
-                IceInternal.HashUtil.hashAdd(ref h, _invocationTimeout);
+                HashUtil.hashAdd(ref h, _protocol);
+                HashUtil.hashAdd(ref h, _encoding);
+                HashUtil.hashAdd(ref h, _invocationTimeout);
                 hashValue_ = h;
                 hashInitialized_ = true;
                 return hashValue_;
             }
+        }
+
+        public bool getCompressOverride(out bool compress)
+        {
+            DefaultsAndOverrides defaultsAndOverrides = getInstance().defaultsAndOverrides();
+            if(defaultsAndOverrides.overrideCompress)
+            {
+                compress = defaultsAndOverrides.overrideCompressValue;
+            }
+            else if(overrideCompress_)
+            {
+                compress = compress_;
+            }
+            else
+            {
+                compress = false;
+                return false;
+            }
+            return true;
         }
 
         public abstract bool isIndirect();
@@ -459,7 +478,7 @@ namespace IceInternal
             return true;
         }
 
-        public Object Clone()
+        public object Clone()
         {
             //
             // A member-wise copy is safe because the members are immutable.
@@ -519,7 +538,7 @@ namespace IceInternal
             compress_ = false;
         }
 
-        protected static System.Random rand_ = new System.Random(unchecked((int)System.DateTime.Now.Ticks));
+        protected static Random rand_ = new Random(unchecked((int)DateTime.Now.Ticks));
     }
 
     public class FixedReference : Reference
@@ -528,7 +547,7 @@ namespace IceInternal
                               Ice.Communicator communicator,
                               Ice.Identity identity,
                               string facet,
-                              Reference.Mode mode,
+                              Mode mode,
                               bool secure,
                               Ice.EncodingVersion encoding,
                               Ice.ConnectionI connection)
@@ -657,11 +676,6 @@ namespace IceInternal
             throw new Ice.FixedProxyException();
         }
 
-        public override string ToString()
-        {
-            throw new Ice.FixedProxyException();
-        }
-
         public override Dictionary<string, string> toProperty(string prefix)
         {
             throw new Ice.FixedProxyException();
@@ -671,9 +685,9 @@ namespace IceInternal
         {
             switch(getMode())
             {
-            case Reference.Mode.ModeTwoway:
-            case Reference.Mode.ModeOneway:
-            case Reference.Mode.ModeBatchOneway:
+            case Mode.ModeTwoway:
+            case Mode.ModeOneway:
+            case Mode.ModeBatchOneway:
             {
                 if(_fixedConnection.endpoint().datagram())
                 {
@@ -682,8 +696,8 @@ namespace IceInternal
                 break;
             }
 
-            case Reference.Mode.ModeDatagram:
-            case Reference.Mode.ModeBatchDatagram:
+            case Mode.ModeDatagram:
+            case Mode.ModeBatchDatagram:
             {
                 if(!_fixedConnection.endpoint().datagram())
                 {
@@ -714,7 +728,7 @@ namespace IceInternal
 
             _fixedConnection.throwException(); // Throw in case our connection is already destroyed.
 
-            bool compress;
+            bool compress = false;
             if(defaultsAndOverrides.overrideCompress)
             {
                 compress = defaultsAndOverrides.overrideCompressValue;
@@ -723,14 +737,8 @@ namespace IceInternal
             {
                 compress = compress_;
             }
-            else
-            {
-                compress = _fixedConnection.endpoint().compress();
-            }
 
-            return ((Ice.ObjectPrxHelperBase)proxy).iceSetRequestHandler(new ConnectionRequestHandler(this,
-                                                                                                     _fixedConnection,
-                                                                                                     compress));
+            return proxy.iceSetRequestHandler(new ConnectionRequestHandler(this, _fixedConnection, compress));
         }
 
         public override BatchRequestQueue getBatchRequestQueue()
@@ -740,7 +748,7 @@ namespace IceInternal
 
         public override bool Equals(object obj)
         {
-            if(object.ReferenceEquals(this, obj))
+            if(ReferenceEquals(this, obj))
             {
                 return true;
             }
@@ -852,7 +860,7 @@ namespace IceInternal
 
         public override Reference changeEndpoints(EndpointI[] newEndpoints)
         {
-            if(Array.Equals(newEndpoints, _endpoints))
+            if(Equals(newEndpoints, _endpoints))
             {
                 return this;
             }
@@ -1090,7 +1098,7 @@ namespace IceInternal
             if(_routerInfo != null)
             {
                 Ice.ObjectPrxHelperBase h = (Ice.ObjectPrxHelperBase)_routerInfo.getRouter();
-                Dictionary<String, String> routerProperties = h.iceReference().toProperty(prefix + ".Router");
+                Dictionary<string, string> routerProperties = h.iceReference().toProperty(prefix + ".Router");
                 foreach(KeyValuePair<string, string> entry in routerProperties)
                 {
                     properties[entry.Key] = entry.Value;
@@ -1100,7 +1108,7 @@ namespace IceInternal
             if(_locatorInfo != null)
             {
                 Ice.ObjectPrxHelperBase h = (Ice.ObjectPrxHelperBase)_locatorInfo.getLocator();
-                Dictionary<String, String> locatorProperties = h.iceReference().toProperty(prefix + ".Locator");
+                Dictionary<string, string> locatorProperties = h.iceReference().toProperty(prefix + ".Locator");
                 foreach(KeyValuePair<string, string> entry in locatorProperties)
                 {
                     properties[entry.Key] = entry.Value;
@@ -1120,7 +1128,7 @@ namespace IceInternal
                 if(!hashInitialized_)
                 {
                     int h = base.GetHashCode(); // Initializes hashValue_.
-                    IceInternal.HashUtil.hashAdd(ref h, _adapterId);
+                    HashUtil.hashAdd(ref h, _adapterId);
                     hashValue_ = h;
                 }
                 return hashValue_;
@@ -1129,7 +1137,7 @@ namespace IceInternal
 
         public override bool Equals(object obj)
         {
-            if(Object.ReferenceEquals(this, obj))
+            if(ReferenceEquals(this, obj))
             {
                 return true;
             }
@@ -1195,7 +1203,6 @@ namespace IceInternal
             }
             return true;
         }
-
 
         private sealed class RouterEndpointsCallback : RouterInfo.GetClientEndpointsCallback
         {
@@ -1353,7 +1360,7 @@ namespace IceInternal
                                  Ice.Communicator communicator,
                                  Ice.Identity identity,
                                  string facet,
-                                 Reference.Mode mode,
+                                 Mode mode,
                                  bool secure,
                                  Ice.ProtocolVersion protocol,
                                  Ice.EncodingVersion encoding,
@@ -1420,7 +1427,7 @@ namespace IceInternal
             //
             for(int i = 0; i < allEndpoints.Length; i++)
             {
-                if(!(allEndpoints[i] is IceInternal.OpaqueEndpointI))
+                if(!(allEndpoints[i] is OpaqueEndpointI))
                 {
                     endpoints.Add(allEndpoints[i]);
                 }
@@ -1431,9 +1438,9 @@ namespace IceInternal
             //
             switch(getMode())
             {
-                case Reference.Mode.ModeTwoway:
-                case Reference.Mode.ModeOneway:
-                case Reference.Mode.ModeBatchOneway:
+                case Mode.ModeTwoway:
+                case Mode.ModeOneway:
+                case Mode.ModeBatchOneway:
                 {
                     //
                     // Filter out datagram endpoints.
@@ -1450,8 +1457,8 @@ namespace IceInternal
                     break;
                 }
 
-                case Reference.Mode.ModeDatagram:
-                case Reference.Mode.ModeBatchDatagram:
+                case Mode.ModeDatagram:
+                case Mode.ModeBatchDatagram:
                 {
                     //
                     // Filter out non-datagram endpoints.
@@ -1623,14 +1630,14 @@ namespace IceInternal
             }
         }
 
-        private class EndpointComparator : IComparer<IceInternal.EndpointI>
+        private class EndpointComparator : IComparer<EndpointI>
         {
             public EndpointComparator(bool preferSecure)
             {
                 _preferSecure = preferSecure;
             }
 
-            public int Compare(IceInternal.EndpointI le, IceInternal.EndpointI re)
+            public int Compare(EndpointI le, EndpointI re)
             {
                 bool ls = le.secure();
                 bool rs = re.secure();

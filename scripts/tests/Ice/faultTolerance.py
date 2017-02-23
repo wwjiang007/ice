@@ -1,6 +1,6 @@
 # **********************************************************************
 #
-# Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+# Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 #
 # This copy of Ice is licensed to you under the terms described in the
 # ICE_LICENSE file included in this distribution.
@@ -16,5 +16,5 @@ servers=range(1, 13)
 
 TestSuite(__name__, [
     ClientServerTestCase(client=Client(args=[i for i in servers]),
-                         servers=[Server(args=[i], waitForShutdown=False) for i in servers])
+                         servers=[Server(args=[i], waitForShutdown=False, quiet=True) for i in servers])
 ])

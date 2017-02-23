@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -280,12 +280,27 @@ public final class Selector
 
                 try
                 {
-                    String s = "fatal error: selector failed:\n" + ex.getCause().getMessage();
-                    _instance.initializationData().logger.error(s);
+                    String s = "selector failed:\n" + ex.getCause().getMessage();
+                    try
+                    {
+                        _instance.initializationData().logger.error(s);
+                    }
+                    catch(Throwable ex1)
+                    {
+                        System.out.println(s);
+                    }
                 }
-                finally
+                catch(Throwable ex2)
                 {
-                    Runtime.getRuntime().halt(1);
+                    // Ignore
+                }
+
+                try
+                {
+                    Thread.sleep(1);
+                }
+                catch(InterruptedException ex2)
+                {
                 }
             }
 

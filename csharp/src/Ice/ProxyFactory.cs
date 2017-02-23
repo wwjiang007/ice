@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -170,12 +170,13 @@ namespace IceInternal
                 throw ex;
             }
 
-
             //
-            // Don't retry if the communicator is destroyed or object adapter
-            // deactivated.
+            // Don't retry if the communicator is destroyed, object adapter is deactivated,
+            // or connection is manually closed.
             //
-            if(ex is Ice.CommunicatorDestroyedException || ex is Ice.ObjectAdapterDeactivatedException)
+            if(ex is Ice.CommunicatorDestroyedException ||
+               ex is Ice.ObjectAdapterDeactivatedException ||
+               ex is Ice.ConnectionManuallyClosedException)
             {
                 throw ex;
             }
@@ -247,7 +248,7 @@ namespace IceInternal
 
                     try
                     {
-                        v = System.Int32.Parse(arr[i], CultureInfo.InvariantCulture);
+                        v = int.Parse(arr[i], CultureInfo.InvariantCulture);
                     }
                     catch(System.FormatException)
                     {

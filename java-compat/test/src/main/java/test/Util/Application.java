@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -92,9 +92,9 @@ public abstract class Application
 
         int status = 0;
 
-        try
+        try(Ice.Communicator communicator = Util.initialize(argHolder, initData))
         {
-            _communicator = Util.initialize(argHolder, initData);
+            _communicator = communicator;
             if(_communicatorListener != null)
             {
                 _communicatorListener.communicatorInitialized(_communicator);
@@ -131,30 +131,11 @@ public abstract class Application
             err.printStackTrace(writer);
             status = 1;
         }
-        writer.flush();
-
-        if(_communicator != null)
+        finally
         {
-            try
-            {
-                _communicator.destroy();
-            }
-            catch(LocalException ex)
-            {
-                writer.println(_testName + ": " + ex);
-                ex.printStackTrace(writer);
-                status = 1;
-            }
-            catch(java.lang.Exception ex)
-            {
-                writer.println(_testName + ": unknown exception");
-                ex.printStackTrace(writer);
-                status = 1;
-            }
             _communicator = null;
         }
         writer.flush();
-
         return status;
     }
 

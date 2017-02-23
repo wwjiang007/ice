@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -27,6 +27,9 @@
     };
 
     var isBrowser = (typeof window !== 'undefined' || typeof WorkerGlobalScope !== 'undefined');
+    var isConnectionFailed = ex => (!isBrowser && ex instanceof Ice.ConnectionRefusedException) ||
+                                   (isBrowser && ex instanceof Ice.ConnectFailedException) ||
+                                   (ex instanceof Ice.ConnectTimeoutException);
 
     var communicator;
     var com;
@@ -185,11 +188,7 @@
             },
             function(ex)
             {
-                if(!(!isBrowser && ex instanceof Ice.ConnectionRefusedException) &&
-                   !(isBrowser && ex instanceof Ice.ConnectFailedException))
-                {
-                    throw ex;
-                }
+                test(isConnectionFailed(ex))
                 out.writeLine("ok");
                 return initialize();
             }
@@ -261,7 +260,7 @@
                     ).then(
                         function(conn)
                         {
-                            return conn.close(false);
+                            return conn.close(Ice.ConnectionClose.GracefullyWithWait);
                         }
                     ).then(
                         function()
@@ -340,7 +339,7 @@
                                                         }).then(
                                                             function(c)
                                                             {
-                                                                return c.close(false);
+                                                                return c.close(Ice.ConnectionClose.GracefullyWithWait);
                                                             }
                                                         );
                                                 }));
@@ -423,7 +422,7 @@
                     ).then(
                         function(conn)
                         {
-                            return conn.close(false);
+                            return conn.close(Ice.ConnectionClose.GracefullyWithWait);
                         }
                     ).then(
                         function()
@@ -586,7 +585,7 @@
                                                         }).then(
                                                             function(c)
                                                             {
-                                                                return c.close(false);
+                                                                return c.close(Ice.ConnectionClose.GracefullyWithWait);
                                                             },
                                                             function(ex)
                                                             {
@@ -652,7 +651,7 @@
                             }
                             return prx.ice_getConnection();
                         }
-                    ).then(conn => conn.close(false)
+                    ).then(conn => conn.close(Ice.ConnectionClose.GracefullyWithWait)
                     ).then(() => names.length > 0 ? f1() : prx);
                 };
 
@@ -679,7 +678,7 @@
                     ).then(
                         function(conn)
                         {
-                            return conn.close(false);
+                            return conn.close(Ice.ConnectionClose.GracefullyWithWait);
                         }
                     ).then(
                         function()
@@ -775,8 +774,7 @@
             },
             function(ex)
             {
-                test((!isBrowser && ex instanceof Ice.ConnectionRefusedException) ||
-                     (isBrowser && ex instanceof Ice.ConnectFailedException));
+                test(isConnectionFailed(ex));
                 return prx.ice_getEndpoints();
             }
         ).then(
@@ -880,8 +878,7 @@
                         },
                         function(ex)
                         {
-                            test((!isBrowser && ex instanceof Ice.ConnectionRefusedException) ||
-                                 (isBrowser && ex instanceof Ice.ConnectFailedException));
+                            test(isConnectionFailed(ex))
                         });
                 };
                 return f1();
@@ -1048,8 +1045,7 @@
                     },
                     function(ex)
                     {
-                        test((!isBrowser && ex instanceof Ice.ConnectionRefusedException) ||
-                             (isBrowser && ex instanceof Ice.ConnectFailedException));
+                        test(isConnectionFailed(ex))
                         return prx.ice_getEndpoints();
                     }
                 ).then(
@@ -1127,7 +1123,7 @@
         return p;
     };
 
-    if(typeof(navigator) !== 'undefined' && isWorker() && (isSafari() || (isWindows() && isChrome())))
+    if(typeof(navigator) !== 'undefined' && isWorker() && isSafari())
     {
         //
         // BUGFIX:
@@ -1139,14 +1135,7 @@
         //
         exports._test = function(out, id)
         {
-            if(isSafari())
-            {
-                out.writeLine("Test not supported with Safari web workers.");
-            }
-            else if(isWindows() && isChrome())
-            {
-                out.writeLine("Test not supported with Chrome web workers.");
-            }
+            out.writeLine("Test not supported with Safari web workers.");   
         };
     }
     else

@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -153,7 +153,7 @@ public class SessionFactoryHelper
     /// </summary>
     /// <param name="protocol">The protocol.</param>
     public void
-    setProtocol(String protocol)
+    setProtocol(string protocol)
     {
         lock(this)
         {
@@ -177,7 +177,7 @@ public class SessionFactoryHelper
     /// Returns the protocol that will be used by the session factory to establish the connection.
     /// </summary>
     /// <returns>The protocol.</returns>
-    public String
+    public string
     getProtocol()
     {
         lock(this)

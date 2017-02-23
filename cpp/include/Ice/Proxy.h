@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -35,6 +35,49 @@ namespace Ice
 {
 
 ICE_API extern const Context noExplicitContext;
+
+}
+
+namespace IceInternal
+{
+
+//
+// Class for handling the proxy's begin_ice_flushBatchRequest request.
+//
+class ICE_API ProxyFlushBatchAsync : public ProxyOutgoingAsyncBase
+{
+public:
+
+    ProxyFlushBatchAsync(const Ice::ObjectPrxPtr&);
+
+    virtual AsyncStatus invokeRemote(const Ice::ConnectionIPtr&, bool, bool);
+    virtual AsyncStatus invokeCollocated(CollocatedRequestHandler*);
+
+    void invoke(const std::string&);
+
+private:
+
+    int _batchRequestNum;
+};
+typedef IceUtil::Handle<ProxyFlushBatchAsync> ProxyFlushBatchAsyncPtr;
+
+//
+// Class for handling the proxy's begin_ice_getConnection request.
+//
+class ICE_API ProxyGetConnection :  public ProxyOutgoingAsyncBase
+{
+public:
+
+    ProxyGetConnection(const Ice::ObjectPrxPtr&);
+
+    virtual AsyncStatus invokeRemote(const Ice::ConnectionIPtr&, bool, bool);
+    virtual AsyncStatus invokeCollocated(CollocatedRequestHandler*);
+
+    virtual Ice::ConnectionPtr getConnection() const;
+
+    void invoke(const std::string&);
+};
+typedef IceUtil::Handle<ProxyGetConnection> ProxyGetConnectionPtr;
 
 }
 

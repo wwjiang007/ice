@@ -1,6 +1,6 @@
 # **********************************************************************
 #
-# Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+# Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 #
 # This copy of Ice is licensed to you under the terms described in the
 # ICE_LICENSE file included in this distribution.
@@ -132,6 +132,8 @@ class IceGridRegistry(ProcessFromBinDir, Server):
             shutil.rmtree(self.dbdir)
 
     def getProps(self, current):
+        # NOTE: we use the loopback interface for multicast with IPv6 to prevent failures
+        # on some machines which don't really have an IPv6 interface configured.
         props = {
             'IceGrid.InstanceName' : 'TestIceGrid',
             'IceGrid.Registry.PermissionsVerifier' : 'TestIceGrid/NullPermissionsVerifier',
@@ -141,7 +143,6 @@ class IceGridRegistry(ProcessFromBinDir, Server):
             'IceGrid.Registry.Server.Endpoints' : 'default',
             'IceGrid.Registry.Internal.Endpoints' : 'default',
             'IceGrid.Registry.Client.Endpoints' : self.getEndpoints(current),
-            'IceGrid.Registry.Discovery.Interface' : '"::1"' if current.config.ipv6 and isinstance(platform, Darwin) else '',
             'IceGrid.Registry.Discovery.Port' : current.driver.getTestPort(99),
             'IceGrid.Registry.SessionManager.Endpoints' : 'default',
             'IceGrid.Registry.AdminSessionManager.Endpoints' : 'default',
@@ -157,6 +158,10 @@ class IceGridRegistry(ProcessFromBinDir, Server):
             'IceGrid.Registry.DefaultTemplates' :
                 '"' + os.path.abspath(os.path.join(toplevel, "cpp", "config", "templates.xml")) + '"'
         }
+
+        if current.config.ipv6 and not isinstance(platform, Linux):
+            props['IceGrid.Registry.Discovery.Interface'] = '::1'
+
         return props
 
     def getEndpoints(self, current):
@@ -259,7 +264,7 @@ class IceGridTestCase(TestCase):
     def runadmin(self, current, cmd, replica="Master", exitstatus=0, quiet=False):
         admin = IceGridAdmin(args=["-r", replica, "-e", cmd], replica=replica, quiet=quiet)
         admin.run(current, exitstatus=exitstatus)
-        return admin.getOutput()
+        return admin.getOutput(current)
 
     def runWithDriver(self, current):
         current.driver.runClientServerTestCase(current)

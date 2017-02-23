@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -33,11 +33,10 @@ const StringUtil = Ice.StringUtil;
 
 class IncomingAsync
 {
-    constructor(instance, connection, adapter, response, compress, requestId)
+    constructor(instance, connection, adapter, response, requestId)
     {
         this._instance = instance;
         this._response = response;
-        this._compress = compress;
         this._connection = connection;
         this._format = Ice.FormatType.DefaultFormat;
 
@@ -230,7 +229,7 @@ class IncomingAsync
 
                 this._os.writeString(ex.operation);
 
-                this._connection.sendResponse(this._os, this._compress);
+                this._connection.sendResponse(this._os);
             }
             else
             {
@@ -251,7 +250,7 @@ class IncomingAsync
                 this._os.writeInt(this._current.requestId);
                 this._os.writeByte(Protocol.replyUnknownLocalException);
                 this._os.writeString(ex.unknown);
-                this._connection.sendResponse(this._os, this._compress);
+                this._connection.sendResponse(this._os);
             }
             else
             {
@@ -272,7 +271,7 @@ class IncomingAsync
                 this._os.writeInt(this._current.requestId);
                 this._os.writeByte(Protocol.replyUnknownUserException);
                 this._os.writeString(ex.unknown);
-                this._connection.sendResponse(this._os, this._compress);
+                this._connection.sendResponse(this._os);
             }
             else
             {
@@ -293,7 +292,7 @@ class IncomingAsync
                 this._os.writeInt(this._current.requestId);
                 this._os.writeByte(Protocol.replyUnknownException);
                 this._os.writeString(ex.unknown);
-                this._connection.sendResponse(this._os, this._compress);
+                this._connection.sendResponse(this._os);
             }
             else
             {
@@ -321,7 +320,7 @@ class IncomingAsync
                     s.push(ex.stack);
                 }
                 this._os.writeString(s.join(""));
-                this._connection.sendResponse(this._os, this._compress);
+                this._connection.sendResponse(this._os);
             }
             else
             {
@@ -339,7 +338,7 @@ class IncomingAsync
                 this._os.startEncapsulation(this._current.encoding, this._format);
                 this._os.writeUserException(ex);
                 this._os.endEncapsulation();
-                this._connection.sendResponse(this._os, this._compress);
+                this._connection.sendResponse(this._os);
             }
             else
             {
@@ -361,7 +360,7 @@ class IncomingAsync
                 this._os.writeByte(Protocol.replyUnknownException);
                 //this._os.writeString(ex.toString());
                 this._os.writeString(ex.toString() + (ex.stack ? "\n" + ex.stack : ""));
-                this._connection.sendResponse(this._os, this._compress);
+                this._connection.sendResponse(this._os);
             }
             else
             {
@@ -466,7 +465,6 @@ class IncomingAsync
         try
         {
             Debug.assert(this._servant !== null);
-
             let promise = this._servant._iceDispatch(this, this._current);
             if(promise !== null)
             {
@@ -527,7 +525,7 @@ class IncomingAsync
 
             if(this._response)
             {
-                this._connection.sendResponse(this._os, this._compress);
+                this._connection.sendResponse(this._os);
             }
             else
             {

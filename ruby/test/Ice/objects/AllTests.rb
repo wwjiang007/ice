@@ -1,6 +1,6 @@
 # **********************************************************************
 #
-# Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+# Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 #
 # This copy of Ice is licensed to you under the terms described in the
 # ICE_LICENSE file included in this distribution.
@@ -8,6 +8,20 @@
 # **********************************************************************
 
 require './TestI.rb'
+
+
+class II < ::Ice::InterfaceByValue
+    def initialize()
+        super("::Test::I")
+    end
+end
+
+class JI < ::Ice::InterfaceByValue
+    def initialize()
+        super("::Test::J")
+    end
+end
+
 
 #
 # Ice for Ruby behaves differently than Ice for C++, because
@@ -28,9 +42,13 @@ class MyValueFactory
         #elsif type == '::Test::D'
         #      return DI.new
         elsif type == '::Test::E'
-              return EI.new
+            return EI.new
         elsif type == '::Test::F'
-              return FI.new
+            return FI.new
+        elsif type == '::Test::I'
+            return II.new
+        elsif type == '::Test::J'
+            return JI.new
         end
         fail "unknown type"
     end
@@ -60,6 +78,8 @@ def allTests(communicator)
     #communicator.getValueFactoryManager().add(factory, '::Test::D')
     communicator.getValueFactoryManager().add(factory, '::Test::E')
     communicator.getValueFactoryManager().add(factory, '::Test::F')
+    communicator.getValueFactoryManager().add(factory, '::Test::I')
+    communicator.getValueFactoryManager().add(factory, '::Test::J')
 
     communicator.addObjectFactory(MyObjectFactory.new, 'TestOF')
 

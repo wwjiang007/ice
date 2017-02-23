@@ -1,6 +1,6 @@
 # **********************************************************************
 #
-# Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+# Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 #
 # This copy of Ice is licensed to you under the terms described in the
 # ICE_LICENSE file included in this distribution.
@@ -45,7 +45,7 @@ def onewaysAMI(communicator, proxy):
     cb.check()
 
     try:
-        p.begin_ice_isA(Test.MyClass.ice_staticId())
+        p.begin_ice_isA(Test._MyClassDisp.ice_staticId())
         test(False)
     except RuntimeError:
         pass

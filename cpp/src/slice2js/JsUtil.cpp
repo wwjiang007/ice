@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -574,9 +574,23 @@ Slice::JsGenerator::getHelper(const TypePtr& type)
         return typeToString(type) + "._helper";
     }
 
-    if(ProxyPtr::dynamicCast(type) || StructPtr::dynamicCast(type))
+    if(StructPtr::dynamicCast(type))
     {
         return typeToString(type);
+    }
+    
+    ProxyPtr prx = ProxyPtr::dynamicCast(type);
+    if(prx)
+    {
+        ClassDefPtr def = prx->_class()->definition();
+        if(def->isInterface() || def->allOperations().size() > 0)
+        {
+            return typeToString(type);
+        }
+        else
+        {
+            return "Ice.ObjectPrx";
+        }
     }
 
     if(SequencePtr::dynamicCast(type) || DictionaryPtr::dynamicCast(type))

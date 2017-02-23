@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -23,6 +23,7 @@
 #include <Ice/Current.ice>
 #include <Ice/Properties.ice>
 #include <Ice/FacetMap.ice>
+#include <Ice/Connection.ice>
 
 /**
  *
@@ -54,7 +55,7 @@ module Ice
  * @see ValueFactory
  *
  **/
-["clr:implements:_System.IDisposable"]
+["clr:implements:_System.IDisposable", "java:implements:java.lang.AutoCloseable", "php:internal"]
 local interface Communicator
 {
     /**
@@ -68,7 +69,7 @@ local interface Communicator
      * @see ObjectAdapter#destroy
      *
      **/
-    void destroy();
+    ["cpp:noexcept"] void destroy();
 
     /**
      *
@@ -493,8 +494,11 @@ local interface Communicator
      * for all connections associated with the communicator.
      * Any errors that occur while flushing a connection are ignored.
      *
+     * @param compress Specifies whether or not the queued batch requests
+     * should be compressed before being sent over the wire.
+     *
      **/
-    ["async-oneway"] void flushBatchRequests();
+    ["async-oneway"] void flushBatchRequests(CompressBatch compress);
 
     /**
      *

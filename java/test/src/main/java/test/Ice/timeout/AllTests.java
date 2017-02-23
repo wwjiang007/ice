@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -262,7 +262,7 @@ public class AllTests
             TimeoutPrx to = TimeoutPrx.checkedCast(obj.ice_timeout(100 * mult));
             com.zeroc.Ice.Connection connection = to.ice_getConnection();
             timeout.holdAdapter(500);
-            connection.close(false);
+            connection.close(com.zeroc.Ice.ConnectionClose.GracefullyWithWait);
             try
             {
                 connection.getInfo(); // getInfo() doesn't throw in the closing state.
@@ -283,9 +283,10 @@ public class AllTests
                 connection.getInfo();
                 test(false);
             }
-            catch(com.zeroc.Ice.CloseConnectionException ex)
+            catch(com.zeroc.Ice.ConnectionManuallyClosedException ex)
             {
                 // Expected.
+                test(ex.graceful);
             }
             timeout.op(); // Ensure adapter is active.
         }
@@ -435,7 +436,20 @@ public class AllTests
                 test(ex.getCause() instanceof com.zeroc.Ice.InvocationTimeoutException);
             }
 
-            proxy.ice_invocationTimeout(-1).ice_ping();
+            try
+            {
+                ((TimeoutPrx)timeout.ice_invocationTimeout(-2)).ice_ping();
+                ((TimeoutPrx)timeout.ice_invocationTimeout(-2)).ice_pingAsync().whenComplete((result, ex) ->
+                    {
+                        test(ex != null);
+                    });
+            }
+            catch(com.zeroc.Ice.Exception ex)
+            {
+                test(false);
+            }
+
+            ((TimeoutPrx)proxy.ice_invocationTimeout(-1)).ice_ping();
 
             TimeoutPrx batchTimeout = proxy.ice_batchOneway();
             batchTimeout.ice_ping();

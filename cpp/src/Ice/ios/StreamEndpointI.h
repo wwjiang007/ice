@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -15,6 +15,7 @@
 #include <Ice/WSEndpoint.h>
 #include <Ice/EndpointFactory.h>
 #include <Ice/InstanceF.h>
+#include <Ice/UniqueRef.h>
 
 #include <CoreFoundation/CFDictionary.h>
 #include <CFNetwork/CFNetwork.h>
@@ -55,7 +56,7 @@ private:
 
     const bool _voip;
     const Ice::CommunicatorPtr _communicator;
-    CFMutableDictionaryRef _proxySettings;
+    IceInternal::UniqueRef<CFMutableDictionaryRef> _proxySettings;
     std::string _proxyHost;
     int _proxyPort;
 };

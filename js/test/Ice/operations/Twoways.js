@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -124,7 +124,7 @@
 
                 return prx.ice_ping();
             }
-        ).then(() => prx.ice_isA(Test.MyClass.ice_staticId())
+        ).then(() => prx.ice_isA(Test._MyClassDisp.ice_staticId())
         ).then(b =>
             {
                 test(b);
@@ -132,7 +132,7 @@
             }
         ).then(id =>
             {
-                test(id === Test.MyDerivedClass.ice_staticId());
+                test(id === Test._MyDerivedClassDisp.ice_staticId());
                 return prx.ice_ids();
             }
         ).then(ids =>

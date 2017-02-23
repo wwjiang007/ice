@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -25,7 +25,7 @@ namespace IceSSL
         /// supply a certificate. The peer's certificate (if any) is the
         /// first one in the chain.
         /// </summary>
-        public System.Security.Cryptography.X509Certificates.X509Certificate2[] nativeCerts;
+        public X509Certificate2[] nativeCerts;
     }
 
     public sealed class Util

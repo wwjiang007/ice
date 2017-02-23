@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -154,6 +154,26 @@ IceInternal::UdpEndpointI::endpoint(const UdpTransceiverPtr& transceiver) const
 {
     return ICE_MAKE_SHARED(UdpEndpointI, _instance, _host, transceiver->effectivePort(), _sourceAddr, _mcastInterface,
                            _mcastTtl, _connect, _connectionId, _compress);
+}
+
+void
+IceInternal::UdpEndpointI::initWithOptions(vector<string>& args, bool oaEndpoint)
+{
+    IPEndpointI::initWithOptions(args, oaEndpoint);
+
+    if(_mcastInterface == "*")
+    {
+        if(oaEndpoint)
+        {
+            const_cast<string&>(_mcastInterface) = string();
+        }
+        else
+        {
+            Ice::EndpointParseException ex(__FILE__, __LINE__);
+            ex.str = "`--interface *' not valid for proxy endpoint `" + toString() + "'";
+            throw ex;
+        }
+    }
 }
 
 string

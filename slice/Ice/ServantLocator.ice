@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -73,7 +73,7 @@ local interface ServantLocator
      * @see #finished
      *
      **/
-    ["UserException"] Object locate(Current curr, out LocalObject cookie);
+    ["java:UserException"] Object locate(Current curr, out LocalObject cookie);
 
     /**
      *
@@ -106,7 +106,7 @@ local interface ServantLocator
      * @see #locate
      *
      **/
-    ["UserException"] void finished(Current curr, Object servant, LocalObject cookie);
+    ["java:UserException"] void finished(Current curr, Object servant, LocalObject cookie);
 
     /**
      *

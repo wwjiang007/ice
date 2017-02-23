@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -139,7 +139,7 @@ IceInternal::UdpTransceiver::bind()
         // address won't be the multicast address and the client will
         // therefore reject the datagram.
         //
-        const_cast<Address&>(_addr) = getAddressForServer("", _port, getProtocolSupport(_addr), false);
+        const_cast<Address&>(_addr) = getAddressForServer("", _port, getProtocolSupport(_addr), false, false);
 #endif
 
         const_cast<Address&>(_addr) = doBind(_fd, _addr, _mcastInterface);
@@ -503,7 +503,7 @@ IceInternal::UdpTransceiver::startWrite(Buffer& buf)
     int err;
     if(_state == StateConnected)
     {
-        err = WSASend(_fd, &_write.buf, 1, &_write.count, 0, &_write, NULL);
+        err = WSASend(_fd, &_write.buf, 1, &_write.count, 0, &_write, ICE_NULLPTR);
     }
     else
     {
@@ -524,7 +524,7 @@ IceInternal::UdpTransceiver::startWrite(Buffer& buf)
             throw ex;
         }
         err = WSASendTo(_fd, &_write.buf, 1, &_write.count, 0, &_peerAddr.sa,
-                        len, &_write, NULL);
+                        len, &_write, ICE_NULLPTR);
     }
 
     if(err == SOCKET_ERROR)
@@ -595,7 +595,7 @@ IceInternal::UdpTransceiver::startRead(Buffer& buf)
     int err;
     if(_state == StateConnected)
     {
-        err = WSARecv(_fd, &_read.buf, 1, &_read.count, &_read.flags, &_read, NULL);
+        err = WSARecv(_fd, &_read.buf, 1, &_read.count, &_read.flags, &_read, ICE_NULLPTR);
     }
     else
     {
@@ -603,7 +603,7 @@ IceInternal::UdpTransceiver::startRead(Buffer& buf)
         _readAddrLen = static_cast<socklen_t>(sizeof(sockaddr_storage));
 
         err = WSARecvFrom(_fd, &_read.buf, 1, &_read.count, &_read.flags,
-                          &_readAddr.sa, &_readAddrLen, &_read, NULL);
+                          &_readAddr.sa, &_readAddrLen, &_read, ICE_NULLPTR);
     }
 
     if(err == SOCKET_ERROR)
@@ -771,7 +771,15 @@ IceInternal::UdpTransceiver::toDetailedString() const
 {
     ostringstream os;
     os << toString();
-    vector<string> intfs = getHostsForEndpointExpand(inetAddrToString(_addr), _instance->protocolSupport(), true);
+    vector<string> intfs;
+    if(isAddressValid(_mcastAddr))
+    {
+        intfs = getInterfacesForMulticast(_mcastInterface, _mcastAddr);
+    }
+    else
+    {
+        intfs = getHostsForEndpointExpand(inetAddrToString(_addr), _instance->protocolSupport(), true);
+    }
     if(!intfs.empty())
     {
         os << "\nlocal interfaces = ";
@@ -952,7 +960,7 @@ IceInternal::UdpTransceiver::UdpTransceiver(const UdpEndpointIPtr& endpoint, con
     _instance(instance),
     _incoming(true),
     _bound(false),
-    _addr(getAddressForServer(host, port, instance->protocolSupport(), instance->preferIPv6())),
+    _addr(getAddressForServer(host, port, instance->protocolSupport(), instance->preferIPv6(), true)),
     _mcastInterface(mcastInterface),
     _port(port),
     _state(connect ? StateNeedConnect : StateNotConnected)

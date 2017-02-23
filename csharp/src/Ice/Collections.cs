@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -17,7 +17,7 @@ namespace IceUtilInternal
     {
         public static bool SequenceEquals(ICollection seq1, ICollection seq2)
         {
-            if(object.ReferenceEquals(seq1, seq2))
+            if(ReferenceEquals(seq1, seq2))
             {
                 return true;
             }
@@ -55,7 +55,7 @@ namespace IceUtilInternal
 
         public static bool SequenceEquals(IEnumerable seq1, IEnumerable seq2)
         {
-            if(object.ReferenceEquals(seq1, seq2))
+            if(ReferenceEquals(seq1, seq2))
             {
                 return true;
             }
@@ -107,7 +107,7 @@ namespace IceUtilInternal
 
         public static bool DictionaryEquals(IDictionary d1, IDictionary d2)
         {
-            if(object.ReferenceEquals(d1, d2))
+            if(ReferenceEquals(d1, d2))
             {
                 return true;
             }
