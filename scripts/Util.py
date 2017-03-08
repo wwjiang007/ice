@@ -7,7 +7,7 @@
 #
 # **********************************************************************
 
-import os, sys, runpy, getopt, traceback, types, threading, time, datetime, re, itertools, random, subprocess, shutil, copy
+import os, sys, runpy, getopt, traceback, types, threading, time, datetime, re, itertools, random, subprocess, shutil, copy, inspect
 
 isPython2 = sys.version_info[0] == 2
 if isPython2:
@@ -41,6 +41,12 @@ def val(v, escapeQuotes=False, quoteValue=True):
             return "\"{0}\"".format(v)
     else:
         return str(v)
+
+def getServantClass(module, name):
+    cls = inspect.getmembers(sys.modules[module], lambda a: inspect.isclass(a) and a.__name__  == name)
+    if not cls:
+        cls = inspect.getmembers(sys.modules[module], lambda a: inspect.isclass(a) and a.__name__  == "_{0}Disp".format(name))
+    return cls[0][1]
 
 def getIceSoVersion():
     config = open(os.path.join(toplevel, "cpp", "include", "IceUtil", "Config.h"), "r")
@@ -330,7 +336,7 @@ class Windows(Platform):
         #
         # Otherwise, use the appropriate nuget package
         #
-        return os.path.join(toplevel, mapping.name, "msbuild", "packages", "zeroc.ice.{0}.{1}".format(comp, version))
+        return os.path.join(mapping.path, "msbuild", "packages", "{0}".format(mapping.getNugetPackage(comp, version)))
 
     def canRun(self, mapping, current):
         #
@@ -1768,7 +1774,7 @@ class RemoteProcessController(ProcessController):
             comm = current.driver.getCommunicator()
             import Test
 
-            class ProcessControllerRegistryI(Test.Common._ProcessControllerRegistryDisp):
+            class ProcessControllerRegistryI(getServantClass("Test.Common", "ProcessControllerRegistry")):
 
                 def __init__(self, remoteProcessController):
                     self.remoteProcessController = remoteProcessController
@@ -2071,7 +2077,6 @@ class BrowserProcessController(RemoteProcessController):
     def __init__(self, current):
         RemoteProcessController.__init__(self, current, "ws -h 127.0.0.1 -p 15002:wss -h 127.0.0.1 -p 15003")
         self.httpServer = None
-        self.safariDriver = None
         try:
             from selenium import webdriver
             if not hasattr(webdriver, current.config.browser):
@@ -2135,10 +2140,6 @@ class BrowserProcessController(RemoteProcessController):
         if self.httpServer:
             self.httpServer.terminate()
             self.httpServer = None
-
-        if self.safariDriver:
-            self.safariDriver.terminate()
-            self.safariDriver = None
 
         try:
             self.driver.quit()
@@ -2455,6 +2456,9 @@ class CppMapping(Mapping):
 
             return True
 
+    def getNugetPackage(self, compiler, version):
+        return "zeroc.ice.{0}.{1}".format(compiler, version)
+
     def getDefaultExe(self, processType, config):
         return platform.getDefaultExe(processType, config)
 
@@ -2498,7 +2502,8 @@ class CppMapping(Mapping):
         libPaths = []
         if isinstance(platform, Windows):
             testcommon = os.path.join(self.path, "test", "Common")
-            libPaths.append(os.path.join(testcommon, self.getBuildDir("testcommon", current)))
+            if os.path.exists(testcommon):
+                libPaths.append(os.path.join(testcommon, self.getBuildDir("testcommon", current)))
 
         #
         # On most platforms, we also need to add the library directory to the library path environment variable.
@@ -2648,6 +2653,9 @@ class CSharpMapping(Mapping):
 
     def getDefaultExe(self, processType, config):
         return "iceboxnet" if processType == "icebox" else processType
+
+    def getNugetPackage(self, compiler, version):
+        return "zeroc.ice.net.{0}".format(version)
 
 class CppBasedMapping(Mapping):
 
@@ -2897,10 +2905,6 @@ class JavaScriptMapping(Mapping):
         # Edge and Ie only support ES5 for now
         if current.config.browser in ["Edge", "Ie"]:
             options["es5"] = [True]
-
-        # TODO: Fix Safari issue where tests hang when ran with --worker
-        if current.config.browser == "Safari":
-            options["worker"] = [False]
 
         return options
 

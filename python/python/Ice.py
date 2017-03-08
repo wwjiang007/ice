@@ -590,21 +590,19 @@ def getSliceDir():
     if os.path.exists(dir):
         return os.path.normpath(dir)
 
-    iceVer = stringVersion()
-
     if sys.platform[:5] == "linux":
         #
-        # Check the default RPM location.
+        # Check the default Linux location.
         #
-        dir = os.path.join("/", "usr", "share", "Ice-" + iceVer, "slice")
+        dir = os.path.join("/", "usr", "share", "ice", "slice")
         if os.path.exists(dir):
             return dir
 
     elif sys.platform == "darwin":
         #
-        # Check the default OS X location.
+        # Check the default macOS homebrew location.
         #
-        dir = os.path.join("/", "Library", "Developer", "Ice-" + iceVer, "slice")
+        dir = os.path.join("/", "usr", "local", "share", "ice",  "slice")
         if os.path.exists(dir):
             return dir
 
@@ -798,6 +796,16 @@ define the enqueue method.'''
 implementation to confirm the batching a this request.'''
         pass
 
+class Dispatcher(object):
+    '''Base class for a dispatcher. A subclass must define the dispatch method.'''
+
+    def __init__(self):
+        pass
+
+    def dispatch(call, con):
+        '''Invoked when a call needs to be dispatched. Invoke call() from the desired thread.'''
+        pass
+
 class BatchRequestInterceptor(object):
     '''Base class for batch request interceptor. A subclass must
 define the enqueue method.'''
@@ -822,11 +830,18 @@ properties: An instance of Ice.Properties. You can use the
 logger: An instance of Ice.Logger.
 
 threadHook: An object that implements ThreadNotification.
+
+dispatcher: An object that implements Dispatcher.
+
+batchRequestInterceptor: An object that implements BatchRequestInterceptor.
+
+valueFactoryManager: An object that implements ValueFactoryManager.
 '''
     def __init__(self):
         self.properties = None
         self.logger = None
         self.threadHook = None
+        self.dispatcher = None
         self.batchRequestInterceptor = None
         self.valueFactoryManager = None
 

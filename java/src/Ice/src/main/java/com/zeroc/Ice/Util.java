@@ -489,7 +489,7 @@ public final class Util
      **/
     public static String stringVersion()
     {
-        return "3.7a4"; // "A.B.C", with A=major, B=minor, C=patch
+        return "3.7b0"; // "A.B.C", with A=major, B=minor, C=patch
     }
 
     /**
@@ -501,7 +501,7 @@ public final class Util
      **/
     public static int intVersion()
     {
-        return 30754; // AABBCC, with AA=major, BB=minor, CC=patch
+        return 30760; // AABBCC, with AA=major, BB=minor, CC=patch
     }
 
     /**
@@ -603,6 +603,15 @@ public final class Util
         }
 
         StringBuilder buf = new StringBuilder(id.length());
+        String pkg = null;
+        for(int i = 0; i < _iceTypeIdPrefixes.length; ++i)
+        {
+            if(id.startsWith(_iceTypeIdPrefixes[i]))
+            {
+                buf.append("com.zeroc");
+                break;
+            }
+        }
 
         int start = 2;
         boolean done = false;
@@ -723,4 +732,17 @@ public final class Util
 
     private static java.lang.Object _processLoggerMutex = new java.lang.Object();
     private static Logger _processLogger = null;
+
+    static private String[] _iceTypeIdPrefixes =
+    {
+        "::Glacier2::",
+        "::Ice::",
+        "::IceBox::",
+        "::IceDiscovery::",
+        "::IceGrid::",
+        "::IceLocatorDiscovery::",
+        "::IceMX::",
+        "::IcePatch2::",
+        "::IceStorm::"
+    };
 }

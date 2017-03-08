@@ -17,6 +17,12 @@ These are the changes since Ice 3.6.3.
 
 ## General Changes
 
+- Implementations of the `Ice::Router` interface can now indicate whether or not
+  they support a routing table through the optional out parameter `hasRoutingTable`
+  of the `getClientProxy` operation. The Ice runtime won't call the `addProxies`
+  operation if the router implementation indicates that it doesn't manage a routing
+  table.
+
 - The `findObjectByType`, `findAllObjectsByType`, `findObjectByTypeOnLeastLoadedNode`
   operations from the `IceGrid::Query` interface and the `allocateObjectByType`
   operation from the `IceGrid::Session` interfaces now only returns proxies for
@@ -185,12 +191,21 @@ These are the changes since Ice 3.6.3.
 - Added getAuthorityKeyIdentifier and getSubjectKeyIdentifier methods to IceSSL::Certificate.
   These methods are not supported on iOS or UWP.
 
+- Upgrade IceSSL Certificate API to allow retrive X509v3 extensions. This feature
+  is currently only supported with OpenSSL and SChannel SSL engines.
+
 ## C# Changes
 
 - Added new interface/class metadata cs:tie. Use this metadata to generate a tie
   class for a given interface or class.
 
 - `cs:` and `clr:` are now interchangeable in metadata directives.
+
+- Add support to preload referenced assemblies. The property Ice.PreloadAssemblies
+  controls this behavior. If set to a value greater than 0 the Ice runtime will try
+  to load all the assemblies referenced by the process during communicator initialization,
+  otherwise the referenced assemblies will be initialized when the Ice run-time needs
+  to lookup a C# class. The default value is 0.
 
 ## Java Changes
 
@@ -237,7 +252,10 @@ These are the changes since Ice 3.6.3.
       MFruitOrange
   } MFruit;
   ```
+
 ## Python Changes
+
+- Added support for the Dispatcher facility.
 
 - The Ice communicator now implements context manager protocol. This enables
   the code to initialize the communicator within a `with` block. The

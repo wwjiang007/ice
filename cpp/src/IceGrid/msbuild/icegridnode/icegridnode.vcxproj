@@ -20,7 +20,6 @@
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <ProjectGuid>{48EF9416-336F-4FA5-A376-FDFB7726ADBA}</ProjectGuid>
-    <WindowsTargetPlatformVersion>8.1</WindowsTargetPlatformVersion>
     <IceBuilderInstallDir>$([MSBuild]::GetRegistryValue('HKEY_CURRENT_USER\SOFTWARE\ZeroC\IceBuilder', 'InstallDir.$(VisualStudioVersion)'))</IceBuilderInstallDir>
     <IceBuilderCppProps>$(IceBuilderInstallDir)\Resources\IceBuilder.Cpp.props</IceBuilderCppProps>
     <IceBuilderCppTargets>$(IceBuilderInstallDir)\Resources\IceBuilder.Cpp.targets</IceBuilderCppTargets>
@@ -97,7 +96,7 @@
     </Link>
     <ClCompile>
       <AdditionalIncludeDirectories>$(Platform)\$(Configuration)\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <AdditionalOptions Condition="'$(DefaultPlatformToolset)'=='v140'">/bigobj -d2SSAOptimizer- %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalOptions Condition="'$(DefaultPlatformToolset)'=='v140' or '$(DefaultPlatformToolset)'=='v141'">/bigobj -d2SSAOptimizer- %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -106,7 +105,7 @@
     </Link>
     <ClCompile>
       <AdditionalIncludeDirectories>$(Platform)\$(Configuration)\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <AdditionalOptions Condition="'$(DefaultPlatformToolset)'=='v140'">/bigobj -d2SSAOptimizer- %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalOptions Condition="'$(DefaultPlatformToolset)'=='v140' or '$(DefaultPlatformToolset)'=='v141'">/bigobj -d2SSAOptimizer- %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
   </ItemDefinitionGroup>
   <ItemGroup>

@@ -39,10 +39,10 @@ function test($b)
 function allTests($communicator)
 {
     global $NS;
-    $ConnectTimeoutException = $NS ? "Ice\\ConnectTimeoutException" : "Ice_ConnectTimeoutException"; 
+    $ConnectTimeoutException = $NS ? "Ice\\ConnectTimeoutException" : "Ice_ConnectTimeoutException";
     $TimeoutException = $NS ? "Ice\\TimeoutException" : "Ice_TimeoutException";
     $InvocationTimeoutException = $NS ? "Ice\\InvocationTimeoutException" : "Ice_InvocationTimeoutException";
-    $CloseGracefullyAndWait = constant($NS ? "Ice\\ConnectionClose::GracefullyWithWait" : 
+    $CloseGracefullyAndWait = constant($NS ? "Ice\\ConnectionClose::GracefullyWithWait" :
                                              "Ice_ConnectionClose::GracefullyWithWait");
     $InitializationData = $NS ? "Ice\\InitializationData" : "Ice_InitializationData";
 
@@ -69,7 +69,11 @@ function allTests($communicator)
         }
         catch(Exception $ex)
         {
-            test($ex instanceof $ConnectTimeoutException);
+            if(!($ex instanceof $ConnectTimeoutException))
+            {
+                echo($ex);
+                test(false);
+            }
         }
     }
     {
@@ -108,7 +112,11 @@ function allTests($communicator)
         catch(Exception $ex)
         {
             // Expected.
-            test($ex instanceof $TimeoutException);
+            if(!($ex instanceof $TimeoutException))
+            {
+                echo($ex);
+                test(false);
+            }
         }
     }
     {
@@ -143,7 +151,11 @@ function allTests($communicator)
         }
         catch(Exception $ex)
         {
-            test($ex instanceof $InvocationTimeoutException);
+            if(!($ex instanceof $InvocationTimeoutException))
+            {
+                echo($ex);
+                test(false);
+            }
         }
 
         $timeout->ice_ping();
@@ -163,11 +175,10 @@ function allTests($communicator)
         //
         // Backward compatible connection timeouts
         //
-        $to = $timeout->ice_invocationTimeout(-2)->ice_timeout(100)->ice_uncheckedCast("::Test::Timeout");
-        $con = null;
+        $to = $timeout->ice_invocationTimeout(-2)->ice_timeout(250)->ice_uncheckedCast("::Test::Timeout");
+        $con = $to->ice_getConnection();
         try
         {
-            $con = $to->ice_getConnection();
             $to->sleep(750);
             test(false);
         }
@@ -181,7 +192,11 @@ function allTests($communicator)
             catch(Exception $ex)
             {
                 // Connection got closed as well.
-                test($ex instanceof $TimeoutException);
+                if(!($ex instanceof $TimeoutException))
+                {
+                    echo($ex);
+                    test(false);
+                }
             }
         }
         $timeout->ice_ping();
@@ -203,7 +218,7 @@ function allTests($communicator)
         {
             test(false);
         }
-        usleep(500 * 1000); 
+        usleep(500 * 1000);
         try
         {
             $connection->getInfo();
@@ -239,7 +254,11 @@ function allTests($communicator)
         catch(Exception $ex)
         {
             // Expected.
-            test($ex instanceof $TimeoutException);
+            if(!($ex instanceof $TimeoutException))
+            {
+                echo($ex);
+                test(false);
+            }
         }
         //
         // Calling ice_timeout() should have no effect.
@@ -254,8 +273,12 @@ function allTests($communicator)
         }
         catch(Exception $ex)
         {
-            // Expected.
-            test($ex instanceof $TimeoutException);
+            // Expected TimeoutException.
+            if(!($ex instanceof $TimeoutException))
+            {
+                echo($ex);
+                test(false);
+            }
         }
         $comm->destroy();
     }
@@ -277,7 +300,11 @@ function allTests($communicator)
         catch(Exception $ex)
         {
             // Expected.
-            test($ex instanceof $ConnectTimeoutException);
+            if(!($ex instanceof $ConnectTimeoutException))
+            {
+                echo($ex);
+                test(false);
+            }
         }
         //
         // Calling ice_timeout() should have no effect on the connect timeout.
@@ -293,7 +320,12 @@ function allTests($communicator)
         catch(Exception $ex)
         {
             // Expected.
-            test($ex instanceof $ConnectTimeoutException);
+            if(!($ex instanceof $ConnectTimeoutException))
+            {
+                echo($ex);
+                test(false);
+            }
+
         }
         //
         // Verify that timeout set via ice_timeout() is still used for requests.
@@ -310,7 +342,11 @@ function allTests($communicator)
         catch(Exception $ex)
         {
             // Expected.
-            test($ex instanceof $TimeoutException);
+            if(!($ex instanceof $TimeoutException))
+            {
+                echo($ex);
+                test(false);
+            }
         }
         $comm->destroy();
     }
@@ -361,7 +397,7 @@ $initData->properties->setProperty("Ice.Warn.Connections", "0");
 //
 $initData->properties->setProperty("Ice.TCP.SndSize", "50000");
 
-$communicator = eval($NS ? "return Ice\\initialize(\$initData);" : 
+$communicator = eval($NS ? "return Ice\\initialize(\$initData);" :
                            "return Ice_initialize(\$initData);");
 
 allTests($communicator);

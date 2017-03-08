@@ -75,6 +75,8 @@ main(int argc, char* argv[])
 
     SessionHelperServer app;
     Ice::InitializationData initData = getTestInitData(argc, argv);
-    return app.main(argc, argv, initData);
+    int status = app.main(argc, argv, initData);
+    cerr << "exit status: " << status << endl;
+    return status;
 }
 
