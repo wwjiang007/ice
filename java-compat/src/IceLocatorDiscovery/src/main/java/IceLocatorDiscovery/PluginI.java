@@ -381,19 +381,13 @@ class PluginI implements Plugin
         public synchronized void
         invoke(Ice.LocatorPrx locator, Request request)
         {
-            if(_locator != null && _locator != locator)
+            if(request != null && _locator != null && _locator != locator)
             {
-                if(request != null)
-                {
-                    request.invoke(_locator);
-                }
+                request.invoke(_locator);
             }
-            else if(IceInternal.Time.currentMonotonicTimeMillis() < _nextRetry)
+            else if(request != null && IceInternal.Time.currentMonotonicTimeMillis() < _nextRetry)
             {
-                if(request != null)
-                {
-                    request.invoke(_voidLocator); // Don't retry to find a locator before the retry delay expires
-                }
+                request.invoke(_voidLocator); // Don't retry to find a locator before the retry delay expires
             }
             else
             {
@@ -567,7 +561,9 @@ class PluginI implements Plugin
         id.name = "Locator";
         id.category = !instanceName.isEmpty() ? instanceName : java.util.UUID.randomUUID().toString();
         _locator = new LocatorI(_name, LookupPrxHelper.uncheckedCast(lookupPrx), properties, instanceName, voidLoc);
-        _communicator.setDefaultLocator(Ice.LocatorPrxHelper.uncheckedCast(_locatorAdapter.addWithUUID(_locator)));
+        _defaultLocator = _communicator.getDefaultLocator();
+        _locatorPrx = Ice.LocatorPrxHelper.uncheckedCast(_locatorAdapter.addWithUUID(_locator));
+        _communicator.setDefaultLocator(_locatorPrx);
 
         Ice.ObjectPrx lookupReply = _replyAdapter.addWithUUID(new LookupReplyI(_locator)).ice_datagram();
         _locator.setLookupReply(LookupReplyPrxHelper.uncheckedCast(lookupReply));
@@ -582,6 +578,11 @@ class PluginI implements Plugin
     {
         _replyAdapter.destroy();
         _locatorAdapter.destroy();
+        // Restore original default locator proxy, if the user didn't change it in the meantime
+        if(_communicator.getDefaultLocator().equals(_locatorPrx))
+        {
+            _communicator.setDefaultLocator(_defaultLocator);
+        }
     }
 
     @Override
@@ -596,4 +597,6 @@ class PluginI implements Plugin
     private Ice.ObjectAdapter _locatorAdapter;
     private Ice.ObjectAdapter _replyAdapter;
     private LocatorI _locator;
+    private Ice.LocatorPrx _locatorPrx;
+    private Ice.LocatorPrx _defaultLocator;
 }

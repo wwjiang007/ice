@@ -20,7 +20,7 @@
         }
     };
 
-    class InitialI extends Test._InitialDisp
+    class InitialI extends Test.Initial
     {
         shutdown(current)
         {
@@ -336,6 +336,16 @@
         supportsCsharpSerializable(current)
         {
             return false;
+        }
+
+        supportsCppStringView(current)
+        {
+            return false;
+        }
+
+        supportsNullOptional(current)
+        {
+            return true;
         }
     }
     exports.InitialI = InitialI;

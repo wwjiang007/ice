@@ -22,7 +22,7 @@ slice {
             files = [file("$sliceDir/Ice/BuiltinSequences.ice")]
         }
         nostream {
-            files = fileTree(dir: "$sliceDir", includes:['Ice/*.ice', 'IceSSL/*.ice'],
+            files = fileTree(dir: "$sliceDir", includes:['Ice/*.ice'],
                 excludes:['Ice/*F.ice', 'Ice/BuiltinSequences.ice'])
         }
     }

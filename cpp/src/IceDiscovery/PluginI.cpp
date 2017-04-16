@@ -147,7 +147,9 @@ PluginI::initialize()
     // Setup locator on the communicator.
     //
     Ice::ObjectPrxPtr loc = _locatorAdapter->addWithUUID(ICE_MAKE_SHARED(LocatorI, _lookup, locatorRegistryPrx));
-    _communicator->setDefaultLocator(ICE_UNCHECKED_CAST(Ice::LocatorPrx, loc));
+    _defaultLocator = _communicator->getDefaultLocator();
+    _locator = ICE_UNCHECKED_CAST(Ice::LocatorPrx, loc);
+    _communicator->setDefaultLocator(_locator);
 
     _multicastAdapter->activate();
     _replyAdapter->activate();
@@ -161,4 +163,9 @@ PluginI::destroy()
     _replyAdapter->destroy();
     _locatorAdapter->destroy();
     _lookup->destroy();
+    // Restore original default locator proxy, if the user didn't change it in the meantime.
+    if(_communicator->getDefaultLocator() == _locator)
+    {
+        _communicator->setDefaultLocator(_defaultLocator);
+    }
 }

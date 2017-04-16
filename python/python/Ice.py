@@ -222,6 +222,16 @@ class InvocationFuture(Future):
             self._asyncResult.cancel()
         return Future.cancel(self)
 
+    def add_done_callback_async(self, fn):
+        with self._condition:
+            if self._state == Future.StateRunning:
+                self._doneCallbacks.append(fn)
+                return
+        if self._asyncResult:
+            self._asyncResult.callLater(lambda: fn(self))
+        else:
+            fn(self)
+
     def is_sent(self):
         with self._condition:
             return self._sent
@@ -796,16 +806,6 @@ define the enqueue method.'''
 implementation to confirm the batching a this request.'''
         pass
 
-class Dispatcher(object):
-    '''Base class for a dispatcher. A subclass must define the dispatch method.'''
-
-    def __init__(self):
-        pass
-
-    def dispatch(call, con):
-        '''Invoked when a call needs to be dispatched. Invoke call() from the desired thread.'''
-        pass
-
 class BatchRequestInterceptor(object):
     '''Base class for batch request interceptor. A subclass must
 define the enqueue method.'''
@@ -829,18 +829,28 @@ properties: An instance of Ice.Properties. You can use the
 
 logger: An instance of Ice.Logger.
 
-threadHook: An object that implements ThreadNotification.
+threadStart: A callable that is invoked for each new Ice thread that is started.
 
-dispatcher: An object that implements Dispatcher.
+threadStop: A callable that is invoked when an Ice thread is stopped.
 
-batchRequestInterceptor: An object that implements BatchRequestInterceptor.
+dispatcher: A callable that is invoked when Ice needs to dispatch an activity. The callable
+    receives two arguments: a callable and an Ice.Connection object. The dispatcher must
+    eventually invoke the callable with no arguments.
+
+batchRequestInterceptor: A callable that will be invoked when a batch request is queued.
+    The callable receives three arguments: a BatchRequest object, an integer representing
+    the number of requests in the queue, and an integer representing the number of bytes
+    consumed by the requests in the queue. The interceptor must eventually invoke the
+    enqueue method on the BatchRequest object.
 
 valueFactoryManager: An object that implements ValueFactoryManager.
 '''
     def __init__(self):
         self.properties = None
         self.logger = None
-        self.threadHook = None
+        self.threadHook = None # Deprecated.
+        self.threadStart = None
+        self.threadStop = None
         self.dispatcher = None
         self.batchRequestInterceptor = None
         self.valueFactoryManager = None
@@ -1478,7 +1488,8 @@ value is an integer representing the exit status.
         # Install our handler for the signals we are interested in. We assume main()
         # is called from the main thread.
         #
-        Application._ctrlCHandler = CtrlCHandler()
+        if Application._signalPolicy == Application.HandleSignals:
+            Application._ctrlCHandler = CtrlCHandler()
 
         try:
             Application._interrupted = False
@@ -1504,8 +1515,9 @@ value is an integer representing the exit status.
         # Set _ctrlCHandler to 0 only once communicator.destroy() has
         # completed.
         #
-        Application._ctrlCHandler.destroy()
-        Application._ctrlCHandler = None
+        if Application._signalPolicy == Application.HandleSignals:
+            Application._ctrlCHandler.destroy()
+            Application._ctrlCHandler = None
 
         return status
 

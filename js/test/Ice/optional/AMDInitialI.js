@@ -20,7 +20,7 @@
         }
     };
 
-    class AMDInitialI extends Test._InitialDisp
+    class AMDInitialI extends Test.Initial
     {
         shutdown(current)
         {
@@ -340,6 +340,16 @@
         supportsCsharpSerializable(current)
         {
             return Promise.resolve(false);
+        }
+
+        supportsCppStringView(current)
+        {
+            return false;
+        }
+
+        supportsNullOptional(current)
+        {
+            return Promise.resolve(true);
         }
     }
 

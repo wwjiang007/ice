@@ -7,6 +7,11 @@
 //
 // **********************************************************************
 
+/* global
+    isSafari : false,
+    isWorker : false
+*/
+
 (function(module, require, exports)
 {
     var Ice = require("ice").Ice;
@@ -78,7 +83,7 @@
                 out.writeLine("ok");
                 out.write("testing connection timeout... ");
                 to = Test.TimeoutPrx.uncheckedCast(obj.ice_timeout(100 * mult));
-                seq = Ice.Buffer.createNative(new Array(10000000));
+                seq = new Uint8Array(10000000);
                 return timeout.holdAdapter(1000 * mult);
             }
         ).then(() => to.sendData(seq) // Expect TimeoutException
@@ -94,7 +99,7 @@
                 to = Test.TimeoutPrx.uncheckedCast(obj.ice_timeout(30000 * mult));
                 return timeout.holdAdapter(500 * mult);
             }
-        ).then(() => to.sendData(Ice.Buffer.createNative(new Array(5 * 1024))) // Expect success.
+        ).then(() => to.sendData(new Uint8Array(5 * 1024)) // Expect success.
         ).then(() =>
             {
                 out.writeLine("ok");
@@ -127,7 +132,7 @@
         ).then(con =>
             {
                 test(to.ice_getCachedConnection() === obj.ice_getCachedConnection());
-                return to.sleep(250);
+                return to.sleep(100);
             }
         ).then(() =>
             {

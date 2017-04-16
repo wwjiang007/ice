@@ -29,9 +29,9 @@ int
 main(int argc, char* argv[])
 {
 #ifdef ICE_STATIC_LIBS
-    Ice::registerIceSSL();
+    Ice::registerIceSSL(false);
 #   if defined(__linux)
-    Ice::registerIceBT();
+    Ice::registerIceBT(false);
 #   endif
 #endif
 
@@ -41,7 +41,7 @@ main(int argc, char* argv[])
         initData.properties->setProperty("Ice.Warn.Connections", "0");
         initData.properties->setProperty("Ice.MessageSizeMax", "10"); // 10KB max
 
-        Ice::CommunicatorHolder ich = Ice::initialize(argc, argv, initData);
+        Ice::CommunicatorHolder ich(argc, argv, initData);
         return run(argc, argv, ich.communicator());
     }
     catch(const Ice::Exception& ex)

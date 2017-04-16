@@ -16,7 +16,18 @@
 #include <Ice/Locator.h>
 #include <Ice/Router.h>
 
+#ifdef _MSC_VER
+#   pragma comment(lib, ICE_LIBNAME("testtransport"))
+#endif
+
 using namespace std;
+
+extern "C"
+{
+
+Ice::Plugin* createTestTransport(const Ice::CommunicatorPtr&, const std::string&, const Ice::StringSeq&);
+
+};
 
 class LocatorI : public Ice::Locator
 {
@@ -148,6 +159,11 @@ run(int, char**, const Ice::CommunicatorPtr& communicator)
 int
 main(int argc, char* argv[])
 {
+#ifdef ICE_STATIC_LIBS
+    Ice::registerIceSSL(false);
+    Ice::registerPluginFactory("Test", createTestTransport, false);
+#endif
+
     try
     {
         Ice::InitializationData initData = getTestInitData(argc, argv);
@@ -170,7 +186,7 @@ main(int argc, char* argv[])
         string defaultProtocol = initData.properties->getPropertyWithDefault("Ice.Default.Protocol", "tcp");
         initData.properties->setProperty("Ice.Default.Protocol", "test-" + defaultProtocol);
 
-        Ice::CommunicatorHolder ich = Ice::initialize(argc, argv, initData);
+        Ice::CommunicatorHolder ich(argc, argv, initData);
         return run(argc, argv, ich.communicator());
     }
     catch(const Ice::Exception& ex)

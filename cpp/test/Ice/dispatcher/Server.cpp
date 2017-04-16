@@ -44,7 +44,7 @@ int
 main(int argc, char* argv[])
 {
 #ifdef ICE_STATIC_LIBS
-    Ice::registerIceSSL();
+    Ice::registerIceSSL(false);
 #endif
     int status;
     try
@@ -66,7 +66,7 @@ main(int argc, char* argv[])
 #else
         initData.dispatcher = new Dispatcher();
 #endif
-        Ice::CommunicatorHolder ich = Ice::initialize(argc, argv, initData);
+        Ice::CommunicatorHolder ich(argc, argv, initData);
         status = run(argc, argv, ich.communicator());
     }
     catch(const Ice::Exception& ex)

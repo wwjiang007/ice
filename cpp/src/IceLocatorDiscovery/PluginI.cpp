@@ -64,11 +64,7 @@ public:
     }
 
     void invoke(const Ice::LocatorPrxPtr&);
-#ifdef ICE_CPP11_MAPPING
-    void response(const bool, pair<const Ice::Byte*, const Ice::Byte*>);
-#else
-    void response(const bool, const pair<const Ice::Byte*, const Ice::Byte*>&);
-#endif
+    void response(bool, const pair<const Ice::Byte*, const Ice::Byte*>&);
     void exception(const Ice::Exception&);
 
 protected:
@@ -105,7 +101,7 @@ public:
 
 #ifdef ICE_CPP11_MAPPING
     virtual void ice_invokeAsync(pair<const Ice::Byte*, const Ice::Byte*>,
-                                 function<void(bool, pair<const Ice::Byte*, const Ice::Byte*>)>,
+                                 function<void(bool, const pair<const Ice::Byte*, const Ice::Byte*>&)>,
                                  function<void(exception_ptr)>,
                                  const Ice::Current&);
 #else
@@ -229,6 +225,8 @@ private:
     Ice::ObjectAdapterPtr _locatorAdapter;
     Ice::ObjectAdapterPtr _replyAdapter;
     LocatorIPtr _locator;
+    Ice::LocatorPrxPtr _locatorPrx;
+    Ice::LocatorPrxPtr _defaultLocator;
 };
 
 }
@@ -336,7 +334,9 @@ PluginI::initialize()
     id.category = !instanceName.empty() ? instanceName : Ice::generateUUID();
     _locator = ICE_MAKE_SHARED(LocatorI, _name, ICE_UNCHECKED_CAST(LookupPrx, lookupPrx), properties, instanceName,
                                voidLocator);
-    _communicator->setDefaultLocator(ICE_UNCHECKED_CAST(Ice::LocatorPrx, _locatorAdapter->add(_locator, id)));
+    _defaultLocator = _communicator->getDefaultLocator();
+    _locatorPrx = ICE_UNCHECKED_CAST(Ice::LocatorPrx, _locatorAdapter->add(_locator, id));
+    _communicator->setDefaultLocator(_locatorPrx);
 
     Ice::ObjectPrxPtr lookupReply = _replyAdapter->addWithUUID(ICE_MAKE_SHARED(LookupReplyI, _locator))->ice_datagram();
     _locator->setLookupReply(ICE_UNCHECKED_CAST(LookupReplyPrx, lookupReply));
@@ -356,6 +356,11 @@ PluginI::destroy()
 {
     _replyAdapter->destroy();
     _locatorAdapter->destroy();
+    // Restore original default locator proxy, if the user didn't change it in the meantime
+    if(_communicator->getDefaultLocator() == _locatorPrx)
+    {
+        _communicator->setDefaultLocator(_defaultLocator);
+    }
 }
 
 void
@@ -381,7 +386,7 @@ Request::invoke(const Ice::LocatorPrxPtr& l)
                                        outPair.first = &outParams[0];
                                        outPair.second = outPair.first + outParams.size();
                                    }
-                                   self->response(ok, move(outPair));
+                                   self->response(ok, outPair);
                                },
                                [self](exception_ptr e)
                                {
@@ -430,19 +435,16 @@ Request::invoke(const Ice::LocatorPrxPtr& l)
 #endif
 }
 
-#ifdef ICE_CPP11_MAPPING
-void
-Request::response(bool ok, pair<const Ice::Byte*, const Ice::Byte*> outParams)
-{
-    _responseCB(ok, move(outParams));
-}
-#else
+
 void
 Request::response(bool ok, const pair<const Ice::Byte*, const Ice::Byte*>& outParams)
 {
+#ifdef ICE_CPP11_MAPPING
+    _responseCB(ok, outParams);
+#else
     _amdCB->ice_response(ok, outParams);
-}
 #endif
+}
 
 void
 Request::exception(const Ice::Exception& ex)
@@ -622,7 +624,7 @@ LocatorI::setLookupReply(const LookupReplyPrxPtr& lookupReply)
 #ifdef ICE_CPP11_MAPPING
 void
 LocatorI::ice_invokeAsync(pair<const Ice::Byte*, const Ice::Byte*> inParams,
-                          function<void(bool, pair<const Ice::Byte*, const Ice::Byte*>)> responseCB,
+                          function<void(bool, const pair<const Ice::Byte*, const Ice::Byte*>&)> responseCB,
                           function<void(exception_ptr)> exceptionCB,
                           const Ice::Current& current)
 {
@@ -783,19 +785,13 @@ void
 LocatorI::invoke(const Ice::LocatorPrxPtr& locator, const RequestPtr& request)
 {
     Lock sync(*this);
-    if(_locator && _locator != locator)
+    if(request && _locator && _locator != locator)
     {
-        if(request)
-        {
-            request->invoke(_locator);
-        }
+        request->invoke(_locator);
     }
-    else if(IceUtil::Time::now() < _nextRetry)
+    else if(request && IceUtil::Time::now() < _nextRetry)
     {
-        if(request)
-        {
-            request->invoke(_voidLocator); // Don't retry to find a locator before the retry delay expires
-        }
+        request->invoke(_voidLocator); // Don't retry to find a locator before the retry delay expires
     }
     else
     {

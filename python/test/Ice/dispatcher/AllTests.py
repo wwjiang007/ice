@@ -17,6 +17,7 @@ class Callback:
     def __init__(self):
         self._called = False
         self._cond = threading.Condition()
+        self._mainThread = threading.current_thread()
 
     def check(self):
         with self._cond:
@@ -70,21 +71,21 @@ def allTests(communicator, collocated):
 
     cb = Callback()
 
-    p.opAsync().add_done_callback(cb.response)
+    p.opAsync().add_done_callback_async(cb.response)
     cb.check()
 
     #
     # Expect NoEndpointException.
     #
     i = p.ice_adapterId("dummy")
-    i.opAsync().add_done_callback(cb.exception)
+    i.opAsync().add_done_callback_async(cb.exception)
     cb.check()
 
     #
     # Expect InvocationTimeoutException.
     #
     to = p.ice_invocationTimeout(250);
-    to.sleepAsync(500).add_done_callback(cb.exceptionEx)
+    to.sleepAsync(500).add_done_callback_async(cb.exceptionEx)
     cb.check()
 
     testController.holdAdapter()
@@ -99,7 +100,7 @@ def allTests(communicator, collocated):
     f = None
     while True:
         f = p.opWithPayloadAsync(seq)
-        f.add_done_callback(cb.payload)
+        f.add_done_callback_async(cb.payload)
         if not f.is_sent_synchronously():
             break
     testController.resumeAdapter()

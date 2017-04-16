@@ -108,7 +108,7 @@ allTests(const Ice::CommunicatorPtr& communicator)
 
     RandomNumberGenerator rng;
 
-	cout << "testing binding with single endpoint... " << flush;
+    cout << "testing binding with single endpoint... " << flush;
     {
         RemoteObjectAdapterPrxPtr adapter = com->createObjectAdapter("Adapter", "default");
 
@@ -242,11 +242,7 @@ allTests(const Ice::CommunicatorPtr& communicator)
         adapters.push_back(com->createObjectAdapter("AdapterRandom14", "default"));
         adapters.push_back(com->createObjectAdapter("AdapterRandom15", "default"));
 
-#ifdef _WIN32
         int count = 20;
-#else
-        int count = 60;
-#endif
         int adapterCount = static_cast<int>(adapters.size());
         while(--count > 0)
         {
@@ -256,17 +252,15 @@ allTests(const Ice::CommunicatorPtr& communicator)
                 com->deactivateObjectAdapter(adapters[4]);
                 --adapterCount;
             }
-            vector<TestIntfPrxPtr> proxies;
-            proxies.resize(10);
 #else
-            if(count < 60 && count % 10 == 0)
+            if(count < 20 && count % 4 == 0)
             {
-                com->deactivateObjectAdapter(adapters[count / 10 - 1]);
+                com->deactivateObjectAdapter(adapters[count / 4 - 1]);
                 --adapterCount;
             }
-            vector<TestIntfPrxPtr> proxies;
-            proxies.resize(40);
 #endif
+            vector<TestIntfPrxPtr> proxies;
+            proxies.resize(10);
             unsigned int i;
             for(i = 0; i < proxies.size(); ++i)
             {
@@ -1026,7 +1020,7 @@ allTests(const Ice::CommunicatorPtr& communicator)
             {
                 Ice::InitializationData clientInitData;
                 clientInitData.properties = *q;
-                Ice::CommunicatorHolder clientCommunicator = Ice::initialize(clientInitData);
+                Ice::CommunicatorHolder clientCommunicator(clientInitData);
                 Ice::ObjectPrxPtr prx = clientCommunicator->stringToProxy(strPrx);
                 try
                 {

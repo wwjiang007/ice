@@ -175,10 +175,13 @@ writeParamList(Output& out, vector<string> params, bool end = true, bool newLine
         out << (*i);
         if(++i != params.end() || !end)
         {
-            out << ", ";
             if(newLine)
             {
-                out << nl;
+                out << "," << nl;
+            }
+            else
+            {
+                out << ", ";
             }
         }
     }
@@ -1406,7 +1409,7 @@ Slice::JavaCompatVisitor::writeDispatchAndMarshalling(Output& out, const ClassDe
             {
                 out << nl << "inS.writeEmptyParams();";
             }
-            out << nl << "return false;";
+            out << nl << "return true;";
 
             out << eb;
         }
@@ -1498,7 +1501,7 @@ Slice::JavaCompatVisitor::writeDispatchAndMarshalling(Output& out, const ClassDe
                 out << ", ";
             }
             out << "current);";
-            out << nl << "return true;";
+            out << nl << "return false;";
 
             out << eb;
         }
@@ -1983,7 +1986,6 @@ Slice::JavaCompatVisitor::writeDocCommentOp(Output& out, const OperationPtr& p)
         return;
     }
 
-
     out << sp << nl << "/**";
 
     //
@@ -1992,7 +1994,11 @@ Slice::JavaCompatVisitor::writeDocCommentOp(Output& out, const OperationPtr& p)
     bool done = false;
     for(StringList::const_iterator i = lines.begin(); i != lines.end() && !done; ++i)
     {
-        if((*i)[0] == '@')
+        if((*i).empty())
+        {
+            out << nl << " *";
+        }
+        else if((*i)[0] == '@')
         {
             done = true;
         }
@@ -2012,7 +2018,7 @@ Slice::JavaCompatVisitor::writeDocCommentOp(Output& out, const OperationPtr& p)
 
 void
 Slice::JavaCompatVisitor::writeDocCommentAsync(Output& out, const OperationPtr& p, ParamDir paramType,
-                                         const string& extraParam)
+                                               const string& extraParam)
 {
     ContainerPtr container = p->container();
     ClassDefPtr contained = ClassDefPtr::dynamicCast(container);
@@ -2049,13 +2055,17 @@ Slice::JavaCompatVisitor::writeDocCommentAsync(Output& out, const OperationPtr& 
             }
             else
             {
-                if((*i)[0] == '@')
+                if((*i).empty())
+                {
+                    out << nl << " *";
+                }
+                else if((*i)[0] == '@')
                 {
                     doneReturn = true;
                 }
                 else
                 {
-                    out << nl << " * " << *i;
+                    out << nl << *i;
                 }
             }
         }
@@ -2068,7 +2078,11 @@ Slice::JavaCompatVisitor::writeDocCommentAsync(Output& out, const OperationPtr& 
         bool done = false;
         for(StringList::const_iterator i = lines.begin(); i != lines.end() && !done; ++i)
         {
-            if((*i)[0] == '@')
+            if((*i).empty())
+            {
+                out << nl << " *";
+            }
+            else if((*i)[0] == '@')
             {
                 done = true;
             }
@@ -2123,7 +2137,11 @@ Slice::JavaCompatVisitor::writeDocCommentAMI(Output& out, const OperationPtr& p,
     bool done = false;
     for(StringList::const_iterator i = lines.begin(); i != lines.end() && !done; ++i)
     {
-        if((*i)[0] == '@')
+        if((*i).empty())
+        {
+            out << nl << " *";
+        }
+        else if((*i)[0] == '@')
         {
             done = true;
         }
@@ -2194,7 +2212,14 @@ Slice::JavaCompatVisitor::writeDocCommentAMI(Output& out, const OperationPtr& p,
 
             if(found)
             {
-                out << nl << " * " << *i;
+                if((*i).empty())
+                {
+                    out << nl << " *";
+                }
+                else
+                {
+                    out << nl << " * " << *i;
+                }
             }
         }
     }
@@ -2250,7 +2275,7 @@ Slice::JavaCompatVisitor::writeDocCommentParam(Output& out, const OperationPtr& 
                 {
                     out << nl << " * " << line;
                     StringList::const_iterator j;
-                    if (i == lines.end())
+                    if(i == lines.end())
                     {
                         break;
                     }
@@ -2260,7 +2285,15 @@ Slice::JavaCompatVisitor::writeDocCommentParam(Output& out, const OperationPtr& 
                         if((*j)[0] != '@')
                         {
                             i = j;
-                            out << nl << " * " << *j++;
+                            if((*j).empty())
+                            {
+                                out << nl << " *";
+                            }
+                            else
+                            {
+                                out << nl << " * " << *j;
+                            }
+                            j++;
                         }
                         else
                         {
@@ -2768,7 +2801,7 @@ Slice::GenCompat::TypesVisitor::visitClassDefStart(const ClassDefPtr& p)
                 {
                     out << "public abstract ";
                 }
-                out << nl << "Ice.AsyncResult begin_" << opname;
+                out << "Ice.AsyncResult begin_" << opname;
                 writeParamList(out, getParamsAsyncLambda(op, package, false, true));
                 out << ';';
 
@@ -2840,7 +2873,8 @@ Slice::GenCompat::TypesVisitor::visitClassDefStart(const ClassDefPtr& p)
                     if(!(*d)->optional())
                     {
                         string memberName = fixKwd((*d)->name());
-                        string memberType = typeToString((*d)->type(), TypeModeMember, package, (*d)->getMetaData());
+                        string memberType = typeToString((*d)->type(), TypeModeMember, package, (*d)->getMetaData(),
+                                                         true, false, p->isLocal());
                         paramDecl.push_back(memberType + " " + memberName);
                     }
                 }
@@ -2892,7 +2926,8 @@ Slice::GenCompat::TypesVisitor::visitClassDefStart(const ClassDefPtr& p)
             for(DataMemberList::const_iterator d = allDataMembers.begin(); d != allDataMembers.end(); ++d)
             {
                 string memberName = fixKwd((*d)->name());
-                string memberType = typeToString((*d)->type(), TypeModeMember, package, (*d)->getMetaData());
+                string memberType = typeToString((*d)->type(), TypeModeMember, package, (*d)->getMetaData(), true,
+                                                 false, p->isLocal());
                 paramDecl.push_back(memberType + " " + memberName);
             }
             out << paramDecl << epar;
@@ -3739,7 +3774,7 @@ Slice::GenCompat::TypesVisitor::visitStructEnd(const StructPtr& p)
         out << nl << "return v;";
         out << eb;
 
-        out << nl << nl << "private static final " << name << " _nullMarshalValue = new " << name << "();";
+        out << sp << nl << "private static final " << name << " _nullMarshalValue = new " << name << "();";
     }
 
     out << sp << nl << "public static final long serialVersionUID = ";
@@ -3789,11 +3824,30 @@ void
 Slice::GenCompat::TypesVisitor::visitDataMember(const DataMemberPtr& p)
 {
     string name = fixKwd(p->name());
-    ContainerPtr container = p->container();
-    ContainedPtr contained = ContainedPtr::dynamicCast(container);
+    const ContainerPtr container = p->container();
+    const ClassDefPtr cls = ClassDefPtr::dynamicCast(container);
+    const StructPtr st = StructPtr::dynamicCast(container);
+    const ExceptionPtr ex = ExceptionPtr::dynamicCast(container);
+    const ContainedPtr contained = ContainedPtr::dynamicCast(container);
     StringList metaData = p->getMetaData();
     TypePtr type = p->type();
-    string s = typeToString(type, TypeModeMember, getPackage(contained), metaData);
+
+    bool local;
+    if(cls)
+    {
+        local = cls->isLocal();
+    }
+    else if(st)
+    {
+        local = st->isLocal();
+    }
+    else
+    {
+        assert(ex);
+        local = ex->isLocal();
+    }
+
+    string s = typeToString(type, TypeModeMember, getPackage(contained), metaData, true, false, local);
     Output& out = output();
     const bool optional = p->optional();
     const bool getSet = p->hasMetaData(_getSetMetaData) || contained->hasMetaData(_getSetMetaData);
@@ -4073,7 +4127,7 @@ Slice::GenCompat::TypesVisitor::visitEnum(const EnumPtr& p)
         {
             out << ',';
         }
-        out << nl;
+        out << sp;
         writeDocComment(out, *en, getDeprecateReason(*en, 0, "enumerator"));
         out << nl << fixKwd((*en)->name()) << '(' << (*en)->value() << ')';
     }
@@ -5228,10 +5282,9 @@ Slice::GenCompat::HelperVisitor::writeOperation(const ClassDefPtr& p, const stri
 
             const string baseClass = getAsyncCallbackBaseClass(op, true);
             out << nl << "return _iceI_begin_" << op->name();
-            writeParamList(out, params, false, false);
-            out << nl
-                << (throws.empty() ? "new " + baseClass + "(responseCb, exceptionCb, sentCb)" :
-                                     "new " + baseClass + "(responseCb, userExceptionCb, exceptionCb, sentCb)");
+            writeParamList(out, params, false);
+            out << (throws.empty() ? "new " + baseClass + "(responseCb, exceptionCb, sentCb)" :
+                    "new " + baseClass + "(responseCb, userExceptionCb, exceptionCb, sentCb)");
             out.inc();
             out << sb;
             out << nl << "public final void _iceCompleted(Ice.AsyncResult result)";

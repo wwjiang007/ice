@@ -13,7 +13,7 @@ def test(b):
     if not b:
         raise RuntimeError('test assertion failed')
 
-class EmptyI(Test._EmptyDisp):
+class EmptyI(Test.Empty):
     pass
 
 class ServantLocatorI(Ice.ServantLocator):
@@ -482,6 +482,8 @@ def allTests(communicator):
             thrower.throwMemoryLimitException(bytearray(20 * 1024)) # 20KB
             test(False)
         except Ice.ConnectionLostException:
+            pass
+        except Ice.UnknownLocalException:
             pass
         except:
             test(False)

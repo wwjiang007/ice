@@ -162,7 +162,12 @@ exception Ex
 
 };
 
-class Initial
+class Recursive
+{
+    Recursive v;
+};
+
+interface Initial
 {
     void shutdown();
     B getB1();
@@ -171,6 +176,9 @@ class Initial
     D getD();
     E getE();
     F getF();
+
+    void setRecursive(Recursive p);
+    bool supportsClassGraphDepthMax();
 
     ["marshaled-result"] B getMB();
     ["amd", "marshaled-result"] B getAMDMB();

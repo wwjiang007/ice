@@ -11,6 +11,10 @@
 #include <TestI.h>
 #include <TestCommon.h>
 
+#if defined(ICE_USE_OPENSSL)
+#  include <IceSSL/OpenSSL.h>
+#endif
+
 DEFINE_TEST("server")
 
 using namespace std;
@@ -44,7 +48,7 @@ int
 main(int argc, char* argv[])
 {
 #ifdef ICE_STATIC_LIBS
-    Ice::registerIceSSL();
+    Ice::registerIceSSL(false);
 #endif
 
     int status;

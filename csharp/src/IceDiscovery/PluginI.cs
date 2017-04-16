@@ -113,7 +113,9 @@ namespace IceDiscovery
             Ice.ObjectPrx loc;
             loc = _locatorAdapter.addWithUUID(
                 new LocatorI(lookup, Ice.LocatorRegistryPrxHelper.uncheckedCast(locatorRegistryPrx)));
-            _communicator.setDefaultLocator(Ice.LocatorPrxHelper.uncheckedCast(loc));
+            _defaultLocator = _communicator.getDefaultLocator();
+            _locator = Ice.LocatorPrxHelper.uncheckedCast(loc);
+            _communicator.setDefaultLocator(_locator);
 
             _multicastAdapter.activate();
             _replyAdapter.activate();
@@ -125,12 +127,19 @@ namespace IceDiscovery
             _multicastAdapter.destroy();
             _replyAdapter.destroy();
             _locatorAdapter.destroy();
+            // Restore original default locator proxy, if the user didn't change it in the meantime
+            if(_communicator.getDefaultLocator().Equals(_locator))
+            {
+                _communicator.setDefaultLocator(_defaultLocator);
+            }
         }
 
         private Ice.Communicator _communicator;
         private Ice.ObjectAdapter _multicastAdapter;
         private Ice.ObjectAdapter _replyAdapter;
         private Ice.ObjectAdapter _locatorAdapter;
+        private Ice.LocatorPrx _locator;
+        private Ice.LocatorPrx _defaultLocator;
     }
 
 }

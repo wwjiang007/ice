@@ -11,7 +11,7 @@
 #include <Ice/LoggerI.h>
 #include <Ice/LoggerUtil.h>
 #include <IceUtil/CtrlCHandler.h>
-#include <IceUtil/ArgVector.h>
+#include <Ice/ArgVector.h>
 
 #ifdef _WIN32
 const DWORD SIGHUP = CTRL_LOGOFF_EVENT;
@@ -21,6 +21,7 @@ const DWORD SIGHUP = CTRL_LOGOFF_EVENT;
 
 using namespace std;
 using namespace Ice;
+using namespace IceInternal;
 using namespace IceUtil;
 using namespace IceUtilInternal;
 
@@ -68,12 +69,8 @@ Ice::Application::~Application()
 }
 
 int
-Ice::Application::main(int argc, char* argv[], const char* configFile)
+Ice::Application::main(int argc, const char* const argv[], ICE_CONFIG_FILE_STRING configFile, int version)
 {
-    //
-    // We don't call the main below to avoid a deprecated warning
-    //
-
     _appName = "";
     if(argc > 0)
     {
@@ -86,7 +83,9 @@ Ice::Application::main(int argc, char* argv[], const char* configFile)
     }
 
     InitializationData initData;
+#ifndef ICE_CPP11_MAPPING
     if(configFile)
+#endif
     {
         try
         {
@@ -106,31 +105,29 @@ Ice::Application::main(int argc, char* argv[], const char* configFile)
             return EXIT_FAILURE;
         }
     }
-    return main(argc, argv, initData);
+    return main(argc, argv, initData, version);
 }
 
 #ifdef _WIN32
-
 int
-Ice::Application::main(int argc, wchar_t* argv[], const char* config)
-{
-    return main(argsToStringSeq(argc, argv), config);
-}
-
-int
-Ice::Application::main(int argc, wchar_t* argv[], const Ice::InitializationData& initData)
+Ice::Application::main(int argc, const wchar_t* const argv[], const Ice::InitializationData& initData, int version)
 {
     //
     // On Windows the given wchar_t* strings are UTF16 and therefore
-    // needs to be converted to native narow string encoding.
+    // needs to be converted to native narrow string encoding.
     //
-    return main(argsToStringSeq(argc, argv), initData);
+    return main(argsToStringSeq(argc, argv), initData, version);
 }
 
+int
+Ice::Application::main(int argc, const wchar_t* const argv[], ICE_CONFIG_FILE_STRING config, int version)
+{
+    return main(argsToStringSeq(argc, argv), config, version);
+}
 #endif
 
 int
-Ice::Application::main(int argc, char* argv[], const InitializationData& initializationData)
+Ice::Application::main(int argc, const char* const argv[], const InitializationData& initializationData, int version)
 {
     if(argc > 0 && argv[0] && ICE_DYNAMIC_CAST(LoggerI, getProcessLogger()))
     {
@@ -148,13 +145,15 @@ Ice::Application::main(int argc, char* argv[], const InitializationData& initial
     }
     int status;
 
+    ArgVector av(argc, argv); // copy args
+
     //
     // We parse the properties here to extract Ice.ProgramName.
     //
     InitializationData initData = initializationData;
     try
     {
-        initData.properties = createProperties(argc, argv, initData.properties);
+        initData.properties = createProperties(av.argc, av.argv, initData.properties);
     }
     catch(const std::exception& ex)
     {
@@ -188,7 +187,7 @@ Ice::Application::main(int argc, char* argv[], const InitializationData& initial
             CtrlCHandler ctrCHandler;
             _ctrlCHandler = &ctrCHandler;
 
-            status = doMain(argc, argv, initData);
+            status = doMain(av.argc, av.argv, initData, version);
 
             //
             // Set _ctrlCHandler to 0 only once communicator->destroy() has completed.
@@ -204,38 +203,24 @@ Ice::Application::main(int argc, char* argv[], const InitializationData& initial
     }
     else
     {
-        status = doMain(argc, argv, initData);
+        status = doMain(av.argc, av.argv, initData, version);
     }
 
     return status;
 }
 
 int
-Ice::Application::main(int argc, char* const argv[], const char* configFile)
-{
-    ArgVector av(argc, argv);
-    return main(av.argc, av.argv, configFile);
-}
-
-int
-Ice::Application::main(int argc, char* const argv[], const Ice::InitializationData& initData)
-{
-    ArgVector av(argc, argv);
-    return main(av.argc, av.argv, initData);
-}
-
-int
-Ice::Application::main(const StringSeq& args, const char* configFile)
+Ice::Application::main(const StringSeq& args, const InitializationData& initData, int version)
 {
     ArgVector av(args);
-    return main(av.argc, av.argv, configFile);
+    return main(av.argc, av.argv, initData, version);
 }
 
 int
-Ice::Application::main(const StringSeq& args, const InitializationData& initData)
+Ice::Application::main(const StringSeq& args, ICE_CONFIG_FILE_STRING configFile, int version)
 {
     ArgVector av(args);
-    return main(av.argc, av.argv, initData);
+    return main(av.argc, av.argv, configFile, version);
 }
 
 void
@@ -410,7 +395,7 @@ Ice::Application::interrupted()
 }
 
 int
-Ice::Application::doMain(int argc, char* argv[], const InitializationData& initData)
+Ice::Application::doMain(int argc, char* argv[], const InitializationData& initData, int version)
 {
     int status;
 
@@ -431,7 +416,7 @@ Ice::Application::doMain(int argc, char* argv[], const InitializationData& initD
             setProcessLogger(ICE_MAKE_SHARED(LoggerI, initData.properties->getProperty("Ice.ProgramName"), "", convert));
         }
 
-        _communicator = initialize(argc, argv, initData);
+        _communicator = initialize(argc, argv, initData, version);
         _destroyed = false;
 
         //

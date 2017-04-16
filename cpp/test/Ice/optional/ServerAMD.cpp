@@ -31,7 +31,7 @@ int
 main(int argc, char* argv[])
 {
 #ifdef ICE_STATIC_LIBS
-    Ice::registerIceSSL();
+    Ice::registerIceSSL(false);
 #endif
 
     int status;
@@ -40,6 +40,9 @@ main(int argc, char* argv[])
     try
     {
         Ice::InitializationData initData = getTestInitData(argc, argv);
+#ifndef ICE_CPP11_MAPPING
+        initData.properties->setProperty("Ice.CollectObjects", "1");
+#endif
         communicator = Ice::initialize(argc, argv, initData);
         status = run(argc, argv, communicator);
 

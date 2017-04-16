@@ -948,6 +948,7 @@ IceInternal::Instance::Instance(const CommunicatorPtr& communicator, const Initi
     _initData(initData),
     _messageSizeMax(0),
     _batchAutoFlushSize(0),
+    _classGraphDepthMax(0),
     _collectObjects(false),
     _toStringMode(ICE_ENUM(ToStringMode, Unicode)),
     _implicitContext(0),
@@ -1020,21 +1021,25 @@ IceInternal::Instance::Instance(const CommunicatorPtr& communicator, const Initi
                 string newUser = _initData.properties->getProperty("Ice.ChangeUser");
                 if(!newUser.empty())
                 {
-                    errno = 0;
-                    struct passwd* pw = getpwnam(newUser.c_str());
-                    if(!pw)
+                    struct passwd pwbuf;
+                    vector<char> buffer(4096); // 4KB initial buffer
+                    struct passwd *pw;
+                    int err = getpwnam_r(newUser.c_str(), &pwbuf, &buffer[0], buffer.size(), &pw);
+                    while(err == ERANGE && buffer.size() < 1024 * 1024) // Limit buffer to 1MB
                     {
-                        if(errno)
-                        {
-                            SyscallException ex(__FILE__, __LINE__);
-                            ex.error = getSystemErrno();
-                            throw ex;
-                        }
-                        else
-                        {
-                            InitializationException ex(__FILE__, __LINE__, "Unknown user account `" + newUser + "'");
-                            throw ex;
-                        }
+                        buffer.resize(buffer.size() * 2);
+                    }
+                    if(err != 0)
+                    {
+                        Ice::SyscallException ex(__FILE__, __LINE__);
+                        ex.error = err;
+                        throw ex;
+                    }
+                    else if(pw == 0)
+                    {
+                        InitializationException ex(__FILE__, __LINE__);
+                        ex.reason ="unknown user account `" + newUser + "'";
+                        throw ex;
                     }
 
                     if(setgid(pw->pw_gid) == -1)
@@ -1189,6 +1194,19 @@ IceInternal::Instance::Instance(const CommunicatorPtr& communicator, const Initi
             }
         }
 
+        {
+            static const int defaultValue = 100;
+            Int num = _initData.properties->getPropertyAsIntWithDefault("Ice.ClassGraphDepthMax", defaultValue);
+            if(num < 1 || static_cast<size_t>(num) > static_cast<size_t>(0x7fffffff))
+            {
+                const_cast<size_t&>(_classGraphDepthMax) = static_cast<size_t>(0x7fffffff);
+            }
+            else
+            {
+                const_cast<size_t&>(_classGraphDepthMax) = static_cast<size_t>(num);
+            }
+        }
+
         const_cast<bool&>(_collectObjects) = _initData.properties->getPropertyAsInt("Ice.CollectObjects") > 0;
 
         string toStringModeStr = _initData.properties->getPropertyWithDefault("Ice.ToStringMode", "Unicode");
@@ -1322,7 +1340,7 @@ IceInternal::Instance::~Instance()
 }
 
 void
-IceInternal::Instance::finishSetup(int& argc, char* argv[], const Ice::CommunicatorPtr& communicator)
+IceInternal::Instance::finishSetup(int& argc, const char* argv[], const Ice::CommunicatorPtr& communicator)
 {
     //
     // Load plug-ins.

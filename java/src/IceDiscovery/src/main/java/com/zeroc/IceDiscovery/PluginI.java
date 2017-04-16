@@ -101,7 +101,9 @@ public class PluginI implements com.zeroc.Ice.Plugin
         // Setup locator on the communicator.
         //
         com.zeroc.Ice.ObjectPrx locator = _locatorAdapter.addWithUUID(new LocatorI(lookup, locatorRegistryPrx));
-        _communicator.setDefaultLocator(com.zeroc.Ice.LocatorPrx.uncheckedCast(locator));
+        _defaultLocator = _communicator.getDefaultLocator();
+        _locator = com.zeroc.Ice.LocatorPrx.uncheckedCast(locator);
+        _communicator.setDefaultLocator(_locator);
 
         _multicastAdapter.activate();
         _replyAdapter.activate();
@@ -114,10 +116,17 @@ public class PluginI implements com.zeroc.Ice.Plugin
         _multicastAdapter.destroy();
         _replyAdapter.destroy();
         _locatorAdapter.destroy();
+        // Restore original default locator proxy, if the user didn't change it in the meantime
+        if(_communicator.getDefaultLocator().equals(_locator))
+        {
+            _communicator.setDefaultLocator(_defaultLocator);
+        }
     }
 
     private com.zeroc.Ice.Communicator _communicator;
     private com.zeroc.Ice.ObjectAdapter _multicastAdapter;
     private com.zeroc.Ice.ObjectAdapter _replyAdapter;
     private com.zeroc.Ice.ObjectAdapter _locatorAdapter;
+    private com.zeroc.Ice.LocatorPrx _locator;
+    private com.zeroc.Ice.LocatorPrx _defaultLocator;
 }

@@ -379,19 +379,13 @@ class PluginI implements Plugin
 
         public synchronized void invoke(com.zeroc.Ice.LocatorPrx locator, Request request)
         {
-            if(_locator != null && _locator != locator)
+            if(request != null && _locator != null && _locator != locator)
             {
-                if(request != null)
-                {
-                    request.invoke(_locator);
-                }
+                request.invoke(_locator);
             }
-            else if(com.zeroc.IceInternal.Time.currentMonotonicTimeMillis() < _nextRetry)
+            else if(request != null && com.zeroc.IceInternal.Time.currentMonotonicTimeMillis() < _nextRetry)
             {
-                if(request != null)
-                {
-                    request.invoke(_voidLocator); // Don't retry to find a locator before the retry delay expires
-                }
+                request.invoke(_voidLocator); // Don't retry to find a locator before the retry delay expires
             }
             else
             {
@@ -564,7 +558,9 @@ class PluginI implements Plugin
         id.name = "Locator";
         id.category = !instanceName.isEmpty() ? instanceName : java.util.UUID.randomUUID().toString();
         _locator = new LocatorI(_name, LookupPrx.uncheckedCast(lookupPrx), properties, instanceName, voidLoc);
-        _communicator.setDefaultLocator(com.zeroc.Ice.LocatorPrx.uncheckedCast(_locatorAdapter.addWithUUID(_locator)));
+        _defaultLocator = _communicator.getDefaultLocator();
+        _locatorPrx = com.zeroc.Ice.LocatorPrx.uncheckedCast(_locatorAdapter.addWithUUID(_locator));
+        _communicator.setDefaultLocator(_locatorPrx);
 
         com.zeroc.Ice.ObjectPrx lookupReply = _replyAdapter.addWithUUID(new LookupReplyI(_locator)).ice_datagram();
         _locator.setLookupReply(LookupReplyPrx.uncheckedCast(lookupReply));
@@ -578,6 +574,11 @@ class PluginI implements Plugin
     {
         _replyAdapter.destroy();
         _locatorAdapter.destroy();
+        // Restore original default locator proxy, if the user didn't change it in the meantime
+        if(_communicator.getDefaultLocator().equals(_locatorPrx))
+        {
+            _communicator.setDefaultLocator(_defaultLocator);
+        }
     }
 
     public List<com.zeroc.Ice.LocatorPrx>
@@ -591,4 +592,6 @@ class PluginI implements Plugin
     private com.zeroc.Ice.ObjectAdapter _locatorAdapter;
     private com.zeroc.Ice.ObjectAdapter _replyAdapter;
     private LocatorI _locator;
+    private com.zeroc.Ice.LocatorPrx _locatorPrx;
+    private com.zeroc.Ice.LocatorPrx _defaultLocator;
 }
