@@ -16,7 +16,11 @@ props = lambda process, current: {
     "Ice.Plugin.IceDiscovery": current.getPluginEntryPoint("IceDiscovery", process)
 }
 
+# Filter-out the warning about invalid lookup proxy
+outfilters = [ lambda x: re.sub("-! .* warning: .*failed to lookup adapter.*\n", "", x),
+               lambda x: re.sub("^   .*\n", "", x) ]
+
 TestSuite(__name__, [
-   ClientServerTestCase(client=Client(args=[3], props=props),
+   ClientServerTestCase(client=Client(args=[3], props=props, outfilters=outfilters),
                         servers=[Server(args=[i], readyCount=4, props=props) for i in range(0, 3)])
 ], multihost=False)

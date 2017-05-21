@@ -16,6 +16,49 @@ using Test;
 
 public class AllTests : TestCommon.AllTests
 {
+    public class PingReplyI : Test.PingReplyDisp_
+    {
+        public override void reply(Ice.Current current)
+        {
+            lock(this)
+            {
+                ++_replies;
+                System.Threading.Monitor.Pulse(this);
+            }
+        }
+
+        public void reset()
+        {
+            lock(this)
+            {
+                 _replies = 0;
+            }
+        }
+
+        public bool waitReply(int expectedReplies, long timeout)
+        {
+            lock(this)
+            {
+                long end = IceInternal.Time.currentMonotonicTimeMillis() + timeout;
+                while(_replies < expectedReplies)
+                {
+                    int delay = (int)(end - IceInternal.Time.currentMonotonicTimeMillis());
+                    if(delay > 0)
+                    {
+                        System.Threading.Monitor.Wait(this, delay);
+                    }
+                    else
+                    {
+                        break;
+                    }
+                }
+                return _replies == expectedReplies;
+            }
+        }
+
+        private int _replies = 0;
+    }
+
     private class Cookie
     {
         public Cookie(int i)
@@ -3704,6 +3747,78 @@ public class AllTests : TestCommon.AllTests
             }
             WriteLine("ok");
         }
+
+        Write("testing ice_scheduler... ");
+        Flush();
+        {
+            p.ice_pingAsync().ContinueWith(
+                (t) =>
+                {
+                    test(Thread.CurrentThread.Name == null ||
+                         !Thread.CurrentThread.Name.Contains("Ice.ThreadPool.Client"));
+                }).Wait();
+
+            p.ice_pingAsync().ContinueWith(
+                (t) =>
+                {
+                    test(Thread.CurrentThread.Name.Contains("Ice.ThreadPool.Client"));
+                }, p.ice_scheduler()).Wait();
+
+            {
+                TaskCompletionSource<int> s1 = new TaskCompletionSource<int>();
+                TaskCompletionSource<int> s2 = new TaskCompletionSource<int>();
+                Task t1 = s1.Task;
+                Task t2 = s2.Task;
+                Task t3 = null;
+                Task t4 = null;
+                p.ice_pingAsync().ContinueWith(
+                    (t) =>
+                    {
+                        test(Thread.CurrentThread.Name.Contains("Ice.ThreadPool.Client"));
+                        //
+                        // t1 Continuation run in the thread that completes it.
+                        //
+                        var id = Thread.CurrentThread.ManagedThreadId;
+                        t3 = t1.ContinueWith(prev =>
+                            {
+                                test(id == Thread.CurrentThread.ManagedThreadId);
+                            },
+                            CancellationToken.None,
+                            TaskContinuationOptions.ExecuteSynchronously,
+                            p.ice_scheduler());
+                        s1.SetResult(1);
+
+                        //
+                        // t2 completed from the main thread
+                        //
+                        t4 = t2.ContinueWith(prev =>
+                            {
+                                test(id != Thread.CurrentThread.ManagedThreadId);
+                                test(Thread.CurrentThread.Name == null ||
+                                     !Thread.CurrentThread.Name.Contains("Ice.ThreadPool.Client"));
+                            },
+                            CancellationToken.None,
+                            TaskContinuationOptions.ExecuteSynchronously,
+                            p.ice_scheduler());
+                    }, p.ice_scheduler()).Wait();
+                s2.SetResult(1);
+                Task.WaitAll(t1, t2, t3, t4);
+            }
+
+            if(!collocated)
+            {
+                communicator.getProperties().setProperty("ReplyAdapter.Endpoints", "tcp");
+                Ice.ObjectAdapter adapter = communicator.createObjectAdapter("ReplyAdapter");
+                PingReplyI replyI = new PingReplyI();
+                Test.PingReplyPrx reply = Test.PingReplyPrxHelper.uncheckedCast(adapter.addWithUUID(replyI));
+                adapter.activate();
+
+                p.ice_getConnection().setAdapter(adapter);
+                p.pingBiDir(reply.ice_getIdentity());
+                replyI.waitReply(1, 100);
+            }
+        }
+        WriteLine("ok");
 
         p.shutdown();
     }

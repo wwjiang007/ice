@@ -94,6 +94,7 @@ main(int argc, char* argv[])
 {
 #ifdef ICE_STATIC_LIBS
     Ice::registerIceSSL(false);
+    Ice::registerIceWS(true);
 #endif
 
 #ifndef _WIN32
@@ -107,7 +108,7 @@ main(int argc, char* argv[])
     sigaction(SIGPIPE, &action, 0);
 #endif
 
-	ClientApp app;
+    ClientApp app;
 #if defined(__APPLE__) || defined(ICE_OS_UWP)
     int result = app._main(argc, argv);
 #else

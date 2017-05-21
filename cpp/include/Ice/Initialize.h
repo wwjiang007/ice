@@ -186,13 +186,20 @@ class ICE_API CommunicatorHolder
 {
 public:
 
+    //
+    // Empty holder
+    //
+    CommunicatorHolder();
+
 #ifdef ICE_CPP11_MAPPING
 
     //
     // Call initialize to create communicator with the provided args
+    // (all except default ctor above)
+    //
     //
     template<class... T>
-    CommunicatorHolder(T&&... args) :
+    explicit CommunicatorHolder(T&&... args) :
         _communicator(std::move(initialize(std::forward<T>(args)...)))
     {
     }
@@ -200,12 +207,15 @@ public:
     //
     // Adopt communicator
     //
-    CommunicatorHolder(std::shared_ptr<Communicator>);
+    explicit CommunicatorHolder(std::shared_ptr<Communicator>);
+    CommunicatorHolder& operator=(std::shared_ptr<Communicator>);
 
     CommunicatorHolder(const CommunicatorHolder&) = delete;
 
     CommunicatorHolder(CommunicatorHolder&&) = default;
     CommunicatorHolder& operator=(CommunicatorHolder&&);
+
+    explicit operator bool() const;
 
 #else // C++98 mapping
 
@@ -217,23 +227,26 @@ public:
     CommunicatorHolder(int&, const char*[], const char*, int = ICE_INT_VERSION);
     CommunicatorHolder(int&, char*[], const char*, int = ICE_INT_VERSION);
 
-#ifdef _WIN32
+#   ifdef _WIN32
     CommunicatorHolder(int&, const wchar_t*[], const InitializationData& = InitializationData(), int = ICE_INT_VERSION);
     CommunicatorHolder(int&, wchar_t*[], const InitializationData& = InitializationData(), int = ICE_INT_VERSION);
     CommunicatorHolder(int&, const wchar_t*[], const char*, int = ICE_INT_VERSION);
     CommunicatorHolder(int&, wchar_t*[], const char*, int = ICE_INT_VERSION);
-#endif
+#   endif
 
-    CommunicatorHolder(StringSeq&, const InitializationData& = InitializationData(),int = ICE_INT_VERSION);
+    explicit CommunicatorHolder(StringSeq&, const InitializationData& = InitializationData(), int = ICE_INT_VERSION);
     CommunicatorHolder(StringSeq&, const char*, int = ICE_INT_VERSION);
 
-    CommunicatorHolder(const InitializationData& = InitializationData(), int = ICE_INT_VERSION);
-    CommunicatorHolder(const char*, int = ICE_INT_VERSION);
+    explicit CommunicatorHolder(const InitializationData&, int = ICE_INT_VERSION);
+    explicit CommunicatorHolder(const char*, int = ICE_INT_VERSION);
 
     //
     // Adopt communicator
     //
-    CommunicatorHolder(const CommunicatorPtr&);
+    explicit CommunicatorHolder(const CommunicatorPtr&);
+    CommunicatorHolder& operator=(const CommunicatorPtr&);
+
+    operator bool() const;
 
     //
     // Required for successful copy-initialization, but not

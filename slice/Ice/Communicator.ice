@@ -9,7 +9,7 @@
 
 #pragma once
 
-[["ice-prefix", "cpp:header-ext:h", "cpp:dll-export:ICE_API", "objc:header-dir:objc", "objc:dll-export:ICE_API"]]
+[["ice-prefix", "cpp:header-ext:h", "cpp:dll-export:ICE_API", "objc:header-dir:objc", "objc:dll-export:ICE_API", "python:pkgdir:Ice"]]
 
 #include <Ice/LoggerF.ice>
 #include <Ice/InstrumentationF.ice>
@@ -598,7 +598,7 @@ local interface Communicator
      *
      **/
     FacetMap findAllAdminFacets();
-};
+}
 
 
 /**
@@ -628,6 +628,6 @@ local enum ToStringMode
      * to generate strings compatible with Ice 3.6 and earlier.
      **/
     Compat
-};
+}
 
-};
+}

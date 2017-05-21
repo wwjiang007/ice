@@ -45,6 +45,11 @@ public class Collocated : TestCommon.Application
         // send() blocking after sending a given amount of data.
         //
         initData.properties.setProperty("Ice.TCP.SndSize", "50000");
+        //
+        // We use a client thread pool with more than one thread to test
+        // that task inlining works.
+        //
+        initData.properties.setProperty("Ice.ThreadPool.Client.Size", "5");
         return initData;
     }
 

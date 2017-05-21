@@ -1221,11 +1221,14 @@ public class SessionKeeper
                             {
                                 if(e.getClickCount() == 2 && e.getButton() == MouseEvent.BUTTON1)
                                 {
-                                    Object obj = _directDiscoveryLocatorModel.getElementAt(
-                                                            _directDiscoveryLocatorList.locationToIndex(e.getPoint()));
-                                    if(obj != null && obj instanceof com.zeroc.Ice.LocatorPrx)
+                                    int index = _directDiscoveryLocatorList.locationToIndex(e.getPoint());
+                                    if(index != -1)
                                     {
-                                        _nextButton.doClick(0);
+                                        Object obj = _directDiscoveryLocatorModel.getElementAt(index);
+                                        if(obj != null && obj instanceof com.zeroc.Ice.LocatorPrx)
+                                        {
+                                            _nextButton.doClick(0);
+                                        }
                                     }
                                 }
                             }
@@ -1986,7 +1989,7 @@ public class SessionKeeper
                             {
                                 if(_directConnection.isSelected())
                                 {
-                                	_cardLayout.show(_cardPanel, WizardStep.DirectMasterStep.toString());
+                                    _cardLayout.show(_cardPanel, WizardStep.DirectMasterStep.toString());
                                     _wizardSteps.push(WizardStep.DirectMasterStep);
                                 }
                                 else
@@ -2081,7 +2084,7 @@ public class SessionKeeper
                                 else
                                 {
                                     _cardLayout.show(_cardPanel,
-                                    		WizardStep.DirectUsernamePasswordCredentialsStep.toString());
+                                    WizardStep.DirectUsernamePasswordCredentialsStep.toString());
                                     _wizardSteps.push(WizardStep.DirectUsernamePasswordCredentialsStep);
                                 }
                                 if(_x509CertificateDefault)
@@ -2110,7 +2113,7 @@ public class SessionKeeper
                                 else
                                 {
                                     _cardLayout.show(_cardPanel,
-                                    		WizardStep.RoutedUsernamePasswordCredentialsStep.toString());
+                                    WizardStep.RoutedUsernamePasswordCredentialsStep.toString());
                                     _wizardSteps.push(WizardStep.RoutedUsernamePasswordCredentialsStep);
                                 }
                                 if(_x509CertificateDefault)
@@ -2206,7 +2209,7 @@ public class SessionKeeper
                                     else
                                     {
                                         _cardLayout.show(_cardPanel,
-                                        		WizardStep.RoutedUsernamePasswordCredentialsStep.toString());
+                                        WizardStep.RoutedUsernamePasswordCredentialsStep.toString());
                                         _wizardSteps.push(WizardStep.RoutedUsernamePasswordCredentialsStep);
                                     }
                                 }
@@ -2478,24 +2481,13 @@ public class SessionKeeper
                             inf.setUseX509Certificate(true);
                         }
 
-                        try
-                        {
-                            inf.save();
-                        }
-                        catch(java.util.prefs.BackingStoreException ex)
-                        {
-                            JOptionPane.showMessageDialog(
-                                    ConnectionWizardDialog.this,
-                                    ex.toString(),
-                                    "Error saving connection",
-                                    JOptionPane.ERROR_MESSAGE);
-                        }
-                        _connectionManagerDialog.load();
-
-                        ConnectionWizardDialog.this.dispose();
                         if(_connectNow)
                         {
                             login(parent, inf);
+                        }
+                        else
+                        {
+                            ConnectionWizardDialog.this.dispose();
                         }
                     }
                 };
@@ -2631,7 +2623,7 @@ public class SessionKeeper
                     }
                     else
                     {
-                    	lastStep = true;
+                        lastStep = true;
                         _certificateAuthButton.requestFocusInWindow();
                     }
                     break;
@@ -3098,7 +3090,6 @@ public class SessionKeeper
         private JLabel _discoveryStatus;
         private JButton _discoveryRefresh;
 
-        private Plugin _discoveryPlugin;
         private JRadioButton _directDiscoveryManualEndpoint;
 
         // Direct Endpoints panel components
@@ -3333,6 +3324,7 @@ public class SessionKeeper
                         public void actionPerformed(ActionEvent e)
                         {
                             JDialog dialog = new ConnectionWizardDialog(ConnectionManagerDialog.this);
+                            setConnectionWizard(dialog);
                             Utils.addEscapeListener(dialog);
                             dialog.setLocationRelativeTo(ConnectionManagerDialog.this);
                             dialog.setVisible(true);
@@ -3547,12 +3539,15 @@ public class SessionKeeper
                             {
                                 if(e.getClickCount() == 2 && e.getButton() == MouseEvent.BUTTON1)
                                 {
-                                    Object obj = _connectionListModel.getElementAt(
-                                        _connectionList.locationToIndex(e.getPoint()));
-                                    if(obj != null && obj instanceof ConnectionInfo)
+                                    int index = _connectionList.locationToIndex(e.getPoint());
+                                    if(index != -1)
                                     {
-                                        ConnectionInfo inf = (ConnectionInfo)obj;
-                                        login(ConnectionManagerDialog.this, inf);
+                                        Object obj = _connectionListModel.getElementAt(index);
+                                        if(obj != null && obj instanceof ConnectionInfo)
+                                        {
+                                            ConnectionInfo inf = (ConnectionInfo)obj;
+                                            login(ConnectionManagerDialog.this, inf);
+                                        }
                                     }
                                 }
                             }
@@ -3668,6 +3663,15 @@ public class SessionKeeper
             }
         }
 
+        public void setConnectionWizard(JDialog dialog)
+        {
+            if(_connectionWizard != null)
+            {
+                _connectionWizard.dispose();
+            }
+            _connectionWizard = dialog;
+        }
+
         class ConnectionListModel extends DefaultListModel
         {
             public void setDefault()
@@ -3716,6 +3720,8 @@ public class SessionKeeper
         private JButton _editConnectionButton;
         private JButton _setDefaultConnectionButton;
         private JButton _removeConnectionButton;
+
+        private JDialog _connectionWizard;
 
         private JButton _connectButton;
     }
@@ -4727,6 +4733,26 @@ public class SessionKeeper
         }
     }
 
+    class StoredPasswordAuthDialog extends AuthDialog
+    {
+        StoredPasswordAuthDialog(JDialog parent)
+        {
+            super(parent, "Login - IceGrid GUI");
+
+            Container contentPane = getContentPane();
+            contentPane.setLayout(new BoxLayout(contentPane, BoxLayout.Y_AXIS));
+
+
+            FormLayout layout = new FormLayout("pref:grow", "");
+            DefaultFormBuilder builder = new DefaultFormBuilder(layout);
+            builder.border(Borders.DIALOG);
+            builder.append(new JLabel("Connecting please wait"));
+            contentPane.add(builder.getPanel());
+            pack();
+            setResizable(false);
+        }
+    }
+
     private void login(final JDialog parent, final ConnectionInfo info)
     {
         if(_authDialog != null)
@@ -4837,6 +4863,8 @@ public class SessionKeeper
                     }
 
                     JButton okButton = new JButton();
+                    JButton cancelButton = new JButton();
+
                     AbstractAction okAction = new AbstractAction("OK")
                         {
                             @Override
@@ -4866,16 +4894,17 @@ public class SessionKeeper
                                 }
                                 else
                                 {
-                                    Cursor oldCursor = parent.getCursor();
-                                    parent.setCursor(Cursor.getPredefinedCursor(Cursor.WAIT_CURSOR));
-                                    dispose();
-                                    _coordinator.login(SessionKeeper.this, info,parent, oldCursor);
+                                    _authDialog.setCursor(Cursor.getPredefinedCursor(Cursor.WAIT_CURSOR));
+                                    _authDialog.setDefaultCloseOperation(WindowConstants.DO_NOTHING_ON_CLOSE);
+                                    Utils.removeEscapeListener(_authDialog);
+                                    okButton.setEnabled(false);
+                                    cancelButton.setEnabled(false);
+                                    _coordinator.login(SessionKeeper.this, info,parent);
                                 }
                             }
                         };
                     okButton.setAction(okAction);
 
-                    JButton cancelButton = new JButton();
                     AbstractAction cancelAction = new AbstractAction("Cancel")
                         {
                             @Override
@@ -4931,13 +4960,15 @@ public class SessionKeeper
                 }
                 else
                 {
-                    Cursor oldCursor = parent.getCursor();
-                    parent.setCursor(Cursor.getPredefinedCursor(Cursor.WAIT_CURSOR));
-                    _coordinator.login(SessionKeeper.this, info, parent, oldCursor);
+                    _authDialog = new StoredPasswordAuthDialog(parent);
+                    _authDialog.setCursor(Cursor.getPredefinedCursor(Cursor.WAIT_CURSOR));
+                    _authDialog.setDefaultCloseOperation(WindowConstants.DO_NOTHING_ON_CLOSE);
+                    _coordinator.login(SessionKeeper.this, info, parent);
+                    _authDialog.showDialog();
                 }
             }
         }
-        else // Auth dialog
+        else // X509CertificateAuthDialog dialog
         {
             class X509CertificateAuthDialog extends AuthDialog
             {
@@ -4987,6 +5018,8 @@ public class SessionKeeper
                     }
 
                     JButton okButton = new JButton();
+                    JButton cancelButton = new JButton();
+
                     AbstractAction okAction = new AbstractAction("OK")
                         {
                             @Override
@@ -5008,16 +5041,17 @@ public class SessionKeeper
                                 }
                                 else
                                 {
-                                    Cursor oldCursor = parent.getCursor();
-                                    parent.setCursor(Cursor.getPredefinedCursor(Cursor.WAIT_CURSOR));
-                                    dispose();
-                                    _coordinator.login(SessionKeeper.this, info, parent, oldCursor);
+                                    _authDialog.setCursor(Cursor.getPredefinedCursor(Cursor.WAIT_CURSOR));
+                                    _authDialog.setDefaultCloseOperation(WindowConstants.DO_NOTHING_ON_CLOSE);
+                                    Utils.removeEscapeListener(_authDialog);
+                                    okButton.setEnabled(false);
+                                    cancelButton.setEnabled(false);
+                                    _coordinator.login(SessionKeeper.this, info, parent);
                                 }
                             }
                         };
                     okButton.setAction(okAction);
 
-                    JButton cancelButton = new JButton();
                     AbstractAction cancelAction = new AbstractAction("Cancel")
                         {
                             @Override
@@ -5068,17 +5102,41 @@ public class SessionKeeper
                 }
                 else
                 {
-                    Cursor oldCursor = parent.getCursor();
-                    parent.setCursor(Cursor.getPredefinedCursor(Cursor.WAIT_CURSOR));
-                    _coordinator.login(SessionKeeper.this, info, parent, oldCursor);
+                    _authDialog = new StoredPasswordAuthDialog(parent);
+                    _authDialog.setCursor(Cursor.getPredefinedCursor(Cursor.WAIT_CURSOR));
+                    _authDialog.setDefaultCloseOperation(WindowConstants.DO_NOTHING_ON_CLOSE);
+                    _coordinator.login(SessionKeeper.this, info, parent);
+                    _authDialog.showDialog();
                 }
             }
         }
     }
 
-    public void loginSuccess(final JDialog parent, final Cursor oldCursor, final long sessionTimeout,
-                             final int acmTimeout, final AdminSessionPrx session, final ConnectionInfo info)
+    public void loginSuccess(final JDialog parent, final long sessionTimeout, final int acmTimeout,
+                             final AdminSessionPrx session, final ConnectionInfo info)
     {
+        try
+        {
+            if(!info.getStorePassword())
+            {
+                info.setPassword(null);
+            }
+            if(!info.getStoreKeyPassword())
+            {
+                info.setKeyPassword(null);
+            }
+            info.save();
+            _connectionManagerDialog.load();
+        }
+        catch(java.util.prefs.BackingStoreException ex)
+        {
+            JOptionPane.showMessageDialog(
+                    parent,
+                    ex.toString(),
+                    "Error saving connection",
+                    JOptionPane.ERROR_MESSAGE);
+        }
+
         assert session != null;
         try
         {
@@ -5118,41 +5176,29 @@ public class SessionKeeper
                 }
                 catch(java.lang.Throwable e)
                 {
-                    SwingUtilities.invokeLater(() -> _connectionManagerDialog.setCursor(oldCursor));
                     return;
                 }
 
                 SwingUtilities.invokeLater(() ->
                     {
-                        _connectionManagerDialog.setCursor(oldCursor);
+                        if(_authDialog != null)
+                        {
+                            _authDialog.dispose();
+                            _authDialog = null;
+                        }
+                        _connectionManagerDialog.setConnectionWizard(null);
                         _connectionManagerDialog.setVisible(false);
-                        if(!info.getStorePassword())
-                        {
-                            info.setPassword(null);
-                        }
-                        if(!info.getStoreKeyPassword())
-                        {
-                            info.setKeyPassword(null);
-                        }
-
-                        if(info.getStorePassword() || info.getStoreKeyPassword())
-                        {
-                            try
-                            {
-                                info.save();
-                            }
-                            catch(java.util.prefs.BackingStoreException ex)
-                            {
-                                JOptionPane.showMessageDialog(
-                                        _coordinator.getMainFrame(),
-                                        ex.toString(),
-                                        "Error saving connection",
-                                        JOptionPane.ERROR_MESSAGE);
-                            }
-                            _connectionManagerDialog.load();
-                        }
                     });
             }).start();
+    }
+
+    public void loginFailed()
+    {
+        if(_authDialog != null)
+        {
+            _authDialog.dispose();
+            _authDialog = null;
+        }
     }
 
     public void permissionDenied(final JDialog parent, final ConnectionInfo info, final String msg)
@@ -5264,7 +5310,11 @@ public class SessionKeeper
                     contentPane.add(builder.getPanel());
                 }
 
-                JButton okButton = new JButton(new AbstractAction("OK")
+                JButton okButton = new JButton();
+                JButton editConnectionButton = new JButton();
+                JButton cancelButton = new JButton();
+
+                AbstractAction okAction = new AbstractAction("OK")
                     {
                         @Override
                         public void actionPerformed(ActionEvent e)
@@ -5296,15 +5346,18 @@ public class SessionKeeper
                             }
                             else
                             {
-                                Cursor oldCursor = parent.getCursor();
-                                parent.setCursor(Cursor.getPredefinedCursor(Cursor.WAIT_CURSOR));
-                                dispose();
-                                _coordinator.login(SessionKeeper.this, info, parent, oldCursor);
+                                _authDialog.setCursor(Cursor.getPredefinedCursor(Cursor.WAIT_CURSOR));
+                                okButton.setEnabled(false);
+                                editConnectionButton.setEnabled(false);
+                                cancelButton.setEnabled(false);
+                                Utils.removeEscapeListener(_authDialog);
+                                _authDialog.setDefaultCloseOperation(WindowConstants.DO_NOTHING_ON_CLOSE);
+                                _coordinator.login(SessionKeeper.this, info, parent);
                             }
                         }
-                    });
+                    };
 
-                JButton editConnectionButton = new JButton(new AbstractAction("Edit Connection")
+                AbstractAction editAction = new AbstractAction("Edit Connection")
                     {
                         @Override
                         public void actionPerformed(ActionEvent e)
@@ -5317,9 +5370,9 @@ public class SessionKeeper
                             dialog.setLocationRelativeTo(parent);
                             dialog.setVisible(true);
                         }
-                    });
+                    };
 
-                JButton cancelButton = new JButton(new AbstractAction("Cancel")
+                AbstractAction cancelAction = new AbstractAction("Cancel")
                     {
                         @Override
                         public void actionPerformed(ActionEvent e)
@@ -5328,7 +5381,7 @@ public class SessionKeeper
                             dispose();
                             _authDialog = null;
                         }
-                    });
+                    };
 
                 JComponent buttonBar = new ButtonBarBuilder().addGlue().addButton(okButton, editConnectionButton,
                     cancelButton).addGlue().build();
@@ -5431,6 +5484,7 @@ public class SessionKeeper
     private static AuthDialog _authDialog;
 
     private final Coordinator _coordinator;
+    private Plugin _discoveryPlugin;
 
     private Session _session;
     private boolean _connectedToMaster = false;

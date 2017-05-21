@@ -11,7 +11,7 @@
 
 #include <Ice/BuiltinSequences.ice>
 
-[["ice-prefix", "cpp:header-ext:h", "cpp:dll-export:ICE_API", "objc:header-dir:objc", "objc:dll-export:ICE_API", "js:ice-build"]]
+[["ice-prefix", "cpp:header-ext:h", "cpp:dll-export:ICE_API", "objc:header-dir:objc", "objc:dll-export:ICE_API", "js:ice-build", "python:pkgdir:Ice"]]
 [["cpp:include:list"]]
 
 #ifndef __SLICE2JAVA_COMPAT__
@@ -56,7 +56,7 @@ enum LogMessageType
      *
      **/
     ErrorMessage
-};
+}
 
 
 /**
@@ -103,7 +103,7 @@ struct LogMessage
      *
      **/
     string message;
-};
+}
 
 
 /**
@@ -151,7 +151,7 @@ interface RemoteLogger
      *
      **/
     void log(LogMessage message);
-};
+}
 
 
 /**
@@ -163,7 +163,7 @@ interface RemoteLogger
  **/
 exception RemoteLoggerAlreadyAttachedException
 {
-};
+}
 
 /**
  *
@@ -231,6 +231,6 @@ interface LoggerAdmin
      *
      **/
     LogMessageSeq getLog(LogMessageTypeSeq messageTypes, StringSeq traceCategories, int messageMax, out string prefix);
-};
+}
 
-};
+}

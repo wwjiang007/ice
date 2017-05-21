@@ -175,7 +175,6 @@ public:
 
     IceInternal::BatchRequestQueuePtr getBatchRequestQueue() const;
 
-    virtual void flushBatchRequests(CompressBatch);
 
 #ifdef ICE_CPP11_MAPPING
     virtual std::function<void()>
@@ -183,6 +182,7 @@ public:
                             ::std::function<void(::std::exception_ptr)>,
                             ::std::function<void(bool)> = nullptr);
 #else
+    virtual void flushBatchRequests(CompressBatch);
     virtual AsyncResultPtr begin_flushBatchRequests(CompressBatch);
     virtual AsyncResultPtr begin_flushBatchRequests(CompressBatch, const CallbackPtr&, const LocalObjectPtr& = 0);
     virtual AsyncResultPtr begin_flushBatchRequests(CompressBatch,
@@ -192,8 +192,8 @@ public:
     virtual void end_flushBatchRequests(const AsyncResultPtr&);
 #endif
 
-    virtual void setCloseCallback(ICE_IN(ICE_CLOSE_CALLBACK));
-    virtual void setHeartbeatCallback(ICE_IN(ICE_HEARTBEAT_CALLBACK));
+    virtual void setCloseCallback(ICE_IN(ICE_DELEGATE(CloseCallback)));
+    virtual void setHeartbeatCallback(ICE_IN(ICE_DELEGATE(HeartbeatCallback)));
 
     virtual void heartbeat();
 
@@ -254,10 +254,10 @@ public:
     void dispatch(const StartCallbackPtr&, const std::vector<OutgoingMessage>&, Byte, Int, Int,
                   const IceInternal::ServantManagerPtr&, const ObjectAdapterPtr&,
                   const IceInternal::OutgoingAsyncBasePtr&,
-                  const ICE_HEARTBEAT_CALLBACK&, Ice::InputStream&);
+                  const ICE_DELEGATE(HeartbeatCallback)&, Ice::InputStream&);
     void finish(bool);
 
-    void closeCallback(const ICE_CLOSE_CALLBACK&);
+    void closeCallback(const ICE_DELEGATE(CloseCallback)&);
 
     virtual ~ConnectionI();
 
@@ -305,7 +305,7 @@ private:
 
     IceInternal::SocketOperation parseMessage(Ice::InputStream&, Int&, Int&, Byte&,
                                               IceInternal::ServantManagerPtr&, ObjectAdapterPtr&,
-                                              IceInternal::OutgoingAsyncBasePtr&, ICE_HEARTBEAT_CALLBACK&, int&);
+                                              IceInternal::OutgoingAsyncBasePtr&, ICE_DELEGATE(HeartbeatCallback)&, int&);
 
     void invokeAll(Ice::InputStream&, Int, Int, Byte,
                    const IceInternal::ServantManagerPtr&, const ObjectAdapterPtr&);
@@ -387,8 +387,8 @@ private:
     bool _initialized;
     bool _validated;
 
-    ICE_CLOSE_CALLBACK _closeCallback;
-    ICE_HEARTBEAT_CALLBACK _heartbeatCallback;
+    ICE_DELEGATE(CloseCallback) _closeCallback;
+    ICE_DELEGATE(HeartbeatCallback) _heartbeatCallback;
 };
 
 }

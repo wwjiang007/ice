@@ -82,7 +82,7 @@ class Platform:
 
     def getFilters(self, config):
         if config.buildConfig in ["static", "cpp11-static"]:
-            return (["Ice/.*", "IceSSL/configuration", "IceDiscovery/simple", "IceGrid/simple"],
+            return (["Ice/.*", "IceSSL/configuration", "IceDiscovery/simple", "IceGrid/simple", "Glacier2/application"],
                     ["Ice/library", "Ice/plugin"])
         return ([], [])
 
@@ -225,9 +225,13 @@ class Linux(Platform):
 
 class Windows(Platform):
 
+    def __init__(self):
+        Platform.__init__(self)
+        self.compiler = ""
+
     def getFilters(self, config):
         if config.uwp:
-            return (["Ice/.*", "IceSSL/configuration"],
+            return (["cpp/Ice/.*", "cpp/IceSSL/configuration"],
                     ["Ice/background",
                      "Ice/echo",
                      "Ice/faultTolerance",
@@ -238,7 +242,12 @@ class Windows(Platform):
                      "Ice/properties",          # Property files are not supported with UWP
                      "Ice/plugin",
                      "Ice/threadPoolPriority"])
-        return Platform.getFilters(self, config)
+        elif self.getCompiler() in ["v100"]:
+            return (["cpp/Ice/.*", "cpp/IceSSL/.*", "cpp/IceBox/.*", "cpp/IceDiscovery/.*", "cpp/IceUtil/.*", "cpp/Slice/.*"], [])
+        elif self.getCompiler() not in ["v140"]:
+            return ([], ["python", "php", "ruby"])
+        else:
+            return ([], ["ruby"])
 
     def parseBuildVariables(self, variables):
         pass # Nothing to do, we don't support the make build system on Windows
@@ -250,31 +259,44 @@ class Windows(Platform):
         return "Release"
 
     def getCompiler(self):
-        out = run("cl")
-        if out.find("Version 16.") != -1:
-            return "v100"
-        elif out.find("Version 17.") != -1:
-            return "v110"
-        elif out.find("Version 18.") != -1:
-            return "v120"
-        elif out.find("Version 19.00.") != -1:
-            return "v140"
-        elif out.find("Version 19.10.") != -1:
-            return "v141"
+        if self.compiler:
+            return self.compiler
+        if os.environ.get("CPP_COMPILER", "") != "":
+            self.compiler = os.environ["CPP_COMPILER"]
+        else:
+            try:
+                out = run("cl")
+                if out.find("Version 16.") != -1:
+                    self.compiler = "v100"
+                elif out.find("Version 17.") != -1:
+                    self.compiler = "v110"
+                elif out.find("Version 18.") != -1:
+                    self.compiler = "v120"
+                elif out.find("Version 19.00.") != -1:
+                    self.compiler = "v140"
+                elif out.find("Version 19.10.") != -1:
+                    self.compiler = "v141"
+            except:
+                pass
+        return self.compiler
 
     def getBinSubDir(self, mapping, process, current):
         #
         # Platform/Config taget bin directories.
         #
         platform = current.driver.configs[mapping].buildPlatform
-        config = "Debug" if current.driver.configs[mapping].buildConfig.find("Debug") >= 0 else "Release"
+        buildConfig = current.driver.configs[mapping].buildConfig
+        config = "Debug" if buildConfig.find("Debug") >= 0 else "Release"
 
         if current.driver.useIceBinDist(mapping):
-            v140 = self.getCompiler() == "v140"
+            compiler = self.getCompiler()
+            v140 = compiler == "v140"
             cpp = isinstance(mapping, CppMapping)
             csharp = isinstance(mapping, CSharpMapping)
 
-            if (cpp and v140 and platform == "x64" and config == "Release") or (not csharp and not cpp):
+            if ((cpp and v140 and platform == "x64" and buildConfig == "Release") or
+                (not csharp and not cpp) or
+                (not compiler)):
                 return "bin"
             elif csharp or isinstance(process, SliceTranslator):
                 return os.path.join("tools")
@@ -318,7 +340,8 @@ class Windows(Platform):
             version = re.search("<IceJSONVersion>(.*)</IceJSONVersion>", configFile.read()).group(1)
         comp = self.getCompiler() if isinstance(mapping, CppMapping) else "net"
 
-        v140 = self.getCompiler() == "v140"
+        compiler = self.getCompiler()
+        v140 = compiler == "v140"
         cpp = isinstance(mapping, CppMapping)
         csharp = isinstance(mapping, CSharpMapping)
 
@@ -326,7 +349,9 @@ class Windows(Platform):
         # Use binary distribution from ICE_HOME if building for C++/VC140/x64/Release or
         # for another mapping than C++ or C#.
         #
-        if (cpp and v140 and platform == "x64" and config == "Release") or (not csharp and not cpp):
+        if ((cpp and v140 and platform == "x64" and current.config.buildConfig == "Release") or
+            (not csharp and not cpp) or
+            (not compiler)):
             return os.environ.get("ICE_HOME")
 
         #
@@ -467,6 +492,10 @@ class Mapping:
             self.uwp = False
             self.openssl = False
 
+            self.device = ""
+            self.avd = ""
+            self.androidemulator = False
+
         def __str__(self):
             s = []
             for o in self.parsedOptions:
@@ -534,7 +563,7 @@ class Mapping:
             parent = re.match(r'^([\w]*).*', testcase.getTestSuite().getId()).group(1)
             if isinstance(testcase, ClientServerTestCase) and parent in ["Ice", "IceBox"]:
                 options = current.driver.filterOptions(testcase, self.coreOptions)
-            elif parent in ["IceGrid", "Glacier2", "IceStorm", "IceDiscovery"]:
+            elif parent in ["IceGrid", "Glacier2", "IceStorm", "IceDiscovery", "IceBridge"]:
                 options = current.driver.filterOptions(testcase, self.serviceOptions)
 
             return [c for c in gen(options)]
@@ -695,10 +724,11 @@ class Mapping:
                 for f in excludes:
                     if f.search(self.name + "/" + testId):
                         return True
-
         return False
 
     def loadTestSuites(self, tests, config, filters=[], rfilters=[]):
+        global currentMapping
+        currentMapping = self
         for test in tests or [""]:
             for root, dirs, files in os.walk(os.path.join(self.getTestsPath(), test.replace('/', os.sep))):
 
@@ -739,6 +769,7 @@ class Mapping:
                 testcases = self.computeTestCases(testId, files)
                 if testcases:
                     TestSuite(root, testcases)
+        currentMapping = None
 
     def getTestSuites(self, ids=[]):
         if not ids:
@@ -868,7 +899,7 @@ class Mapping:
         sslProps = {
             "Ice.Plugin.IceSSL" : self.getPluginEntryPoint("IceSSL", process, current),
             "IceSSL.Password": "password",
-            "IceSSL.DefaultDir": os.path.join(toplevel, "certs"),
+            "IceSSL.DefaultDir": "" if current.config.buildPlatform == "iphoneos" else os.path.join(toplevel, "certs"),
         }
 
         #
@@ -989,7 +1020,7 @@ class Process(Runnable):
             print("unexpected exception while filtering process output:\n" + str(ex))
             raise
 
-    def run(self, current, args=[], props={}, exitstatus=0, timeout=120):
+    def run(self, current, args=[], props={}, exitstatus=0, timeout=480):
         class WatchDog:
 
             def __init__(self, timeout):
@@ -1568,9 +1599,10 @@ class Result:
 class TestSuite:
 
     def __init__(self, path, testcases=None, options=None, libDirs=None, runOnMainThread=False, chdir=False,
-                 multihost=True):
+                 multihost=True, mapping=None):
+        global currentMapping
         self.path = os.path.dirname(path) if os.path.basename(path) == "test.py" else path
-        self.mapping = Mapping.getByPath(self.path)
+        self.mapping = currentMapping or Mapping.getByPath(self.path)
         self.id = self.mapping.addTestSuite(self)
         self.options = options or {}
         self.libDirs = libDirs or []
@@ -1746,8 +1778,11 @@ class RemoteProcessController(ProcessController):
             self.proxy.waitReady(startTimeout)
 
         def waitSuccess(self, exitstatus=0, timeout=60):
+            import Ice
             try:
                 result = self.proxy.waitSuccess(timeout)
+            except Ice.LocalException:
+                raise
             except:
                 raise Expect.TIMEOUT("waitSuccess timeout")
             if exitstatus != result:
@@ -1896,16 +1931,137 @@ class RemoteProcessController(ProcessController):
         if self.adapter:
             self.adapter.destroy()
 
+class AndroidProcessController(RemoteProcessController):
+
+    def __init__(self, current):
+        run("adb kill-server")
+        RemoteProcessController.__init__(self, current,
+            "tcp -h 127.0.0.1 -p 15001" if current.config.androidemulator else None)
+        self.device = current.config.device
+        self.avd = current.config.avd
+        self.androidemulator = current.config.androidemulator
+
+    def __str__(self):
+        return "Android"
+
+    def getControllerIdentity(self, current):
+        return "Android/ProcessController"
+
+    def adb(self):
+        return "adb -s {}".format(self.device) if self.device else "adb"
+
+    def emulator(self):
+        #
+        # We need to use emulator fullpath, otherwise fails to start with
+        # :Qt library not found at ..\emulator\lib64\qt\lib
+        #
+        emu = "emulator.exe" if sys.platform == "win32" else "emulator"
+        for d in os.environ.get("PATH").split(os.pathsep):
+            if os.path.isfile(os.path.join(d, emu)):
+                return os.path.join(d, emu)
+
+    def startEmulator(self, config):
+        #
+        # First check if the AVD image is available
+        #
+        out = run("{} -list-avds".format(self.emulator()))
+        if config.avd not in out:
+            raise RuntimeError("couldn't find AVD `{}'".format(config.avd))
+
+        #
+        # Find and unused port to run android emulator, between 5554 and 5584
+        #
+        port = -1
+        out = run("adb devices -l")
+        for p in range(5554, 5586, 2):
+            if not "emulator-{}".format(p) in out:
+                port = p
+
+        if port == -1:
+            raise RuntimeError("cannot find free port in range 5554-5584, to run android emulator")
+
+        self.device = "emulator-{}".format(port)
+        cmd = "{0} -avd {1} -port {2} -wipe-data".format(self.emulator(), config.avd, port)
+        self.emulator = subprocess.Popen(cmd, shell=True)
+
+        if self.emulator.poll():
+            raise RuntimeError("failed to start Android emulator with AVD {} on port {}".format(config.avd, port))
+
+        self.avd = config.avd
+
+        #
+        # Wait for the device to be ready
+        #
+        t = time.time()
+        while True:
+            try:
+                lines = run("{} shell getprop sys.boot_completed".format(self.adb()))
+                if len(lines) > 0 and lines[0].strip() == "1":
+                    break
+            except RuntimeError:
+                pass # expected if device is offline
+            #
+            # If the emulator doesn't complete boot in 60 seconds give up
+            #
+            if (time.time() - t) > 60:
+                raise RuntimeError("couldn't start Android emulator with avd {}".format(config.avd))
+            time.sleep(2)
+        print(" ok")
+
+    def startControllerApp(self, current, ident):
+        if current.config.avd:
+            self.startEmulator(current.config)
+        run("{} install -r test/controller/build/outputs/apk/testController-debug.apk".format(self.adb()))
+        run("{} shell am start -n com.zeroc.testcontroller/.ControllerActivity".format(self.adb()))
+
+    def stopControllerApp(self, ident):
+        try:
+            run("{} shell pm uninstall com.zeroc.testcontroller".format(self.adb()))
+        except:
+            pass
+
+        if self.avd:
+            try:
+                run("{} emu kill".format(self.adb()))
+            except:
+                pass
+
+            try:
+                run("adm kill-server")
+            except:
+                pass
+        #
+        # Wait for the emulator to shutdown
+        #
+        if self.emulator:
+            sys.stdout.write("Wainting for emulator to shutdown..")
+            sys.stdout.flush()
+            while True:
+                if self.emulator.poll() != None:
+                    print(" ok")
+                    break
+                sys.stdout.write(".")
+                sys.stdout.flush()
+                time.sleep(0.5)
+
+
 class iOSSimulatorProcessController(RemoteProcessController):
 
     device = "iOSSimulatorProcessController"
     deviceID = "com.apple.CoreSimulator.SimDeviceType.iPhone-6"
-    runtimeID = "com.apple.CoreSimulator.SimRuntime.iOS-10-3"
     appPath = "ios/controller/build"
 
     def __init__(self, current):
         RemoteProcessController.__init__(self, current)
         self.simulatorID = None
+        self.runtimeID = None
+        # Pick the last iOS simulator runtime ID in the list of iOS simulators (assumed to be the latest).
+        for r in run("xcrun simctl list runtimes").split('\n'):
+            m = re.search("iOS .* \(.*\) \((.*)\)", r)
+            if m:
+                self.runtimeID = m.group(1)
+        if not self.runtimeID:
+            self.runtimeID = "com.apple.CoreSimulator.SimRuntime.iOS-10-3" # Default value
 
     def __str__(self):
         return "iOS Simulator"
@@ -2028,8 +2184,8 @@ class UWPProcessController(RemoteProcessController):
         config = current.config.buildConfig
         layout = os.path.join(toplevel, "cpp", "test", platform, config, "AppX")
 
-        self.packageFullName = "{0}_1.0.0.0_{1}__3qjctahehqazm".format(
-            self.name, "x86" if platform == "Win32" else platform)
+        arch = "x86" if platform == "Win32" else platform
+        self.packageFullName = "{0}_1.0.0.0_{1}__3qjctahehqazm".format(self.name, arch)
 
         prefix = "controller_1.0.0.0_{0}{1}".format(platform, "_{0}".format(config) if config == "Debug" else "")
         package = os.path.join(toplevel, "cpp", "msbuild", "AppPackages", "controller",
@@ -2054,7 +2210,10 @@ class UWPProcessController(RemoteProcessController):
         run("MakeAppx.exe unpack /p \"{0}\" /d \"{1}\" /l".format(package, layout))
 
         print("Registering application to run from layout...")
-        run("powershell Add-AppxPackage -Register \"{0}/AppxManifest.xml\"".format(layout))
+        dependenciesDir = os.path.join(os.path.dirname(package), "Dependencies", arch)
+        for f in filter(lambda f: f.endswith(".appx"), os.listdir(dependenciesDir)):
+            run("powershell Add-AppxPackage -Path \"{0}\" -ForceApplicationShutdown".format(os.path.join(dependenciesDir, f)))
+        run("powershell Add-AppxPackage -Register \"{0}/AppxManifest.xml\" -ForceApplicationShutdown".format(layout))
 
         run("CheckNetIsolation LoopbackExempt -a -n={0}".format(self.appUserModelId))
 
@@ -2401,6 +2560,9 @@ class Driver:
                 processController = UWPProcessController
         elif process and isinstance(process.getMapping(current), JavaScriptMapping) and current.config.browser:
             processController = BrowserProcessController
+        elif process and (isinstance(process.getMapping(current), AndroidMapping) or
+                          isinstance(process.getMapping(current), AndroidCompatMapping)):
+            processController = AndroidProcessController
         else:
             processController = LocalProcessController
 
@@ -2458,10 +2620,15 @@ class CppMapping(Mapping):
                 return False
 
             # No C++11 tests for IceStorm, IceGrid, etc
-            parent = re.match(r'^([\w]*).*', current.testcase.getTestSuite().getId()).group(1)
-            if self.cpp11 and not parent in ["IceUtil", "Slice", "Ice", "IceSSL", "IceDiscovery", "IceBox"]:
-                return False
-
+            if self.cpp11:
+                testId = current.testcase.getTestSuite().getId()
+                parent = re.match(r'^([\w]*).*', testId).group(1)
+                if parent in ["IceStorm", "IceBridge"]:
+                    return False
+                elif parent in ["IceGrid"] and testId not in ["IceGrid/simple"]:
+                    return False
+                elif parent in ["Glacier2"] and testId not in ["Glacier2/application", "Glacier2/sessionHelper"]:
+                    return False
             return True
 
     def getNugetPackage(self, compiler, version):
@@ -2500,7 +2667,8 @@ class CppMapping(Mapping):
         return {
             "IceSSL" : "IceSSLOpenSSL:createIceSSLOpenSSL" if current.config.openssl else "IceSSL:createIceSSL",
             "IceBT" : "IceBT:createIceBT",
-            "IceDiscovery" : "IceDiscovery:createIceDiscovery"
+            "IceDiscovery" : "IceDiscovery:createIceDiscovery",
+            "IceLocatorDiscovery" : "IceLocatorDiscovery:createIceLocatorDiscovery"
         }[plugin]
 
     def getEnv(self, process, current):
@@ -2569,7 +2737,8 @@ class JavaMapping(Mapping):
         return {
             "IceSSL" : "com.zeroc.IceSSL.PluginFactory",
             "IceBT" : "com.zeroc.IceBT.PluginFactory",
-            "IceDiscovery" : "com.zeroc.IceDiscovery.PluginFactory"
+            "IceDiscovery" : "com.zeroc.IceDiscovery.PluginFactory",
+            "IceLocatorDiscovery" : "com.zeroc.IceLocatorDiscovery.PluginFactory"
         }[plugin]
 
     def getEnv(self, process, current):
@@ -2597,7 +2766,8 @@ class JavaCompatMapping(JavaMapping):
         return {
             "IceSSL" : "IceSSL.PluginFactory",
             "IceBT" : "IceBT.PluginFactory",
-            "IceDiscovery" : "IceDiscovery.PluginFactory"
+            "IceDiscovery" : "IceDiscovery.PluginFactory",
+            "IceLocatorDiscovery" : "IceLocatorDiscovery.PluginFactory"
         }[plugin]
 
     def getDefaultExe(self, processType, config=None):
@@ -2609,6 +2779,74 @@ class JavaCompatMapping(JavaMapping):
             "icebox": "IceBox.Server",
             "iceboxadmin" : "IceBox.Admin",
         }[processType]
+
+class Android:
+
+    @classmethod
+    def getUnsuportedTests(self, protocol):
+        tests = [
+            "Ice/hash",
+            "Ice/faultTolerance",
+            "Ice/metrics",
+            "Ice/networkProxy",
+            "Ice/throughput",
+            "Ice/plugin",
+            "Ice/properties"]
+        if protocol in ["ssl", "wss"]:
+            tests += [
+                "Ice/binding",
+                "Ice/timeout",
+                "Ice/udp"]
+        return tests
+
+class AndroidMapping(JavaMapping):
+
+    def getTestsPath(self):
+        return os.path.join(self.path, "../java/test/src/main/java/test")
+
+    def filterTestSuite(self, testId, config, filters=[], rfilters=[]):
+        if not testId.startswith("Ice/"):
+            return True
+        return JavaMapping.filterTestSuite(self, testId, config, filters, rfilters)
+
+class AndroidCompatMapping(JavaCompatMapping):
+
+    class Config(Mapping.Config):
+
+        @classmethod
+        def getSupportedArgs(self):
+            return ("", ["device=", "avd=", "androidemulator"])
+
+        @classmethod
+        def usage(self):
+            print("")
+            print("Android Mapping options:")
+            print("--device=<device-id>      Id of the emulator or device used to run the tests.")
+            print("--androidemulator         Run tests in emulator as opposed to a real device.")
+            print("--avd                     Start emulator image")
+
+        def __init__(self, options=[]):
+            Mapping.Config.__init__(self, options)
+
+            parseOptions(self, options, { "device" : "device", "avd" : "avd" })
+            self.androidemulator = self.androidemulator or self.avd
+
+    def getSSLProps(self, process, current):
+        props = JavaCompatMapping.getSSLProps(self, process, current)
+        props.update({
+            "IceSSL.KeystoreType" : "BKS",
+            "IceSSL.TruststoreType" : "BKS",
+            "Ice.InitPlugins" : "0",
+            "IceSSL.Keystore": "server.bks" if isinstance(process, Server) else "client.bks"})
+        return props
+
+    def getTestsPath(self):
+        return os.path.join(self.path, "../java-compat/test/src/main/java/test")
+
+    def filterTestSuite(self, testId, config, filters=[], rfilters=[]):
+        if not testId.startswith("Ice/") or testId in Android.getUnsuportedTests(config.protocol):
+            return True
+        return JavaCompatMapping.filterTestSuite(self, testId, config, filters, rfilters)
 
 class CSharpMapping(Mapping):
 
@@ -2637,7 +2875,8 @@ class CSharpMapping(Mapping):
                                      "lib" if current.driver.useIceBinDist(self) else "Assemblies")
         return {
             "IceSSL" : plugindir + "/IceSSL.dll:IceSSL.PluginFactory",
-            "IceDiscovery" : plugindir + "/IceDiscovery.dll:IceDiscovery.PluginFactory"
+            "IceDiscovery" : plugindir + "/IceDiscovery.dll:IceDiscovery.PluginFactory",
+            "IceLocatorDiscovery" : plugindir + "/IceLocatorDiscovery.dll:IceLocatorDiscovery.PluginFactory"
         }[plugin]
 
     def getEnv(self, process, current):
@@ -2646,7 +2885,7 @@ class CSharpMapping(Mapping):
             assembliesDir = os.path.join(platform.getIceInstallDir(self, current), "lib")
         else:
             bzip2 = os.path.join(toplevel, "cpp", "msbuild", "packages",
-                                 "bzip2.{0}.1.0.6.6".format(platform.getCompiler()),
+                                 "bzip2.{0}.1.0.6.7".format(platform.getCompiler()),
                                  "build", "native", "bin", "x64", "Release")
             assembliesDir = os.path.join(current.driver.getIceDir(self, current), "Assemblies")
         return { "DEVPATH" : assembliesDir, "PATH" : bzip2 };
@@ -2936,6 +3175,16 @@ from IceStormUtil import *
 from LocalDriver import *
 
 #
+# Check if the Android SDK is installed by looking for adb
+#
+hasAndroidSDK=False
+try:
+    run("adb version")
+    hasAndroidSDK=True
+except:
+    pass
+
+#
 # Supported mappings
 #
 for m in filter(lambda x: os.path.isdir(os.path.join(toplevel, x)),  os.listdir(toplevel)):
@@ -2957,6 +3206,10 @@ for m in filter(lambda x: os.path.isdir(os.path.join(toplevel, x)),  os.listdir(
         Mapping.add(m, CSharpMapping())
     elif m == "objective-c" or re.match("objective-c-*", m):
         Mapping.add(m, ObjCMapping())
+    elif hasAndroidSDK and m == "android-compat":
+        Mapping.add(m, AndroidCompatMapping())
+    elif hasAndroidSDK and m == "android":
+        Mapping.add(m, AndroidMapping())
 
 def runTestsWithPath(path):
     runTests([Mapping.getByPath(path)])

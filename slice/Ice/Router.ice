@@ -9,7 +9,7 @@
 
 #pragma once
 
-[["ice-prefix", "cpp:header-ext:h", "cpp:dll-export:ICE_API", "objc:header-dir:objc", "objc:dll-export:ICE_API", "js:ice-build"]]
+[["ice-prefix", "cpp:header-ext:h", "cpp:dll-export:ICE_API", "objc:header-dir:objc", "objc:dll-export:ICE_API", "js:ice-build", "python:pkgdir:Ice"]]
 
 #include <Ice/BuiltinSequences.ice>
 
@@ -69,7 +69,7 @@ interface Router
      *
      **/
     idempotent ObjectProxySeq addProxies(ObjectProxySeq proxies);
-};
+}
 
 /**
  *
@@ -91,6 +91,6 @@ interface RouterFinder
      *
      **/
     Router* getRouter();
-};
+}
 
-};
+}

@@ -3346,7 +3346,7 @@ Slice::Gen::ObjectVisitor::emitOneShotConstructor(const ClassDefPtr& p)
         DataMemberList dataMembers = p->dataMembers();
 
         int typeContext = p->isLocal() ? (_useWstring | TypeContextLocal) : _useWstring;
-        
+
         for(DataMemberList::const_iterator q = allDataMembers.begin(); q != allDataMembers.end(); ++q)
         {
 
@@ -5208,7 +5208,7 @@ Slice::Gen::Cpp11DeclVisitor::visitClassDecl(const ClassDeclPtr& p)
     }
 
     H << nl << "class " << fixKwd(p->name()) << ';';
-    if(p->isInterface() || (def && !def->allOperations().empty()))
+    if(!p->isLocal() && (p->isInterface() || (def && !def->allOperations().empty())))
     {
         H << nl << "class " << p->name() << "Prx;";
     }
@@ -6333,7 +6333,7 @@ Slice::Gen::Cpp11ObjectVisitor::emitDataMember(const DataMemberPtr& p)
     ClassDefPtr cl = ClassDefPtr::dynamicCast(container);
     if(cl->isLocal())
     {
-        typeContext |= TypeContextLocal; 
+        typeContext |= TypeContextLocal;
     }
 
     H << nl << typeToString(p->type(), p->optional(), p->getMetaData(), typeContext) << ' ' << name;
@@ -6408,12 +6408,41 @@ Slice::Gen::Cpp11LocalObjectVisitor::visitClassDefStart(const ClassDefPtr& p)
     {
         return false;
     }
+
+    string name = fixKwd(p->name());
+
     if(p->isDelegate())
     {
+        int typeCtx = _useWstring | TypeContextLocal | TypeContextCpp11;
+
+        // Generate alias
+        H << sp << nl << "using " << name << " = ";
+
+        // A delegate only has one operation
+        OperationPtr op = p->allOperations().front();
+        TypePtr ret = op->returnType();
+        string retS = returnTypeToString(ret, op->returnIsOptional(), op->getMetaData(), typeCtx);
+
+        H << "::std::function<" << retS << "(";
+
+        ParamDeclList paramList = op->parameters();
+        for(ParamDeclList::iterator q = paramList.begin(); q != paramList.end(); ++q)
+        {
+            if((*q)->isOutParam())
+            {
+                H << outputTypeToString((*q)->type(), (*q)->optional(), (*q)->getMetaData(), typeCtx);
+            }
+            else
+            {
+                H << inputTypeToString((*q)->type(), (*q)->optional(), (*q)->getMetaData(), typeCtx);
+            }
+            H << (IceUtilInternal::distance(q, paramList.end()) == 1  ? "" : ", ");
+        }
+        H << ")>;";
+
         return false;
     }
 
-    string name = fixKwd(p->name());
     string scope = fixKwd(p->scope());
     string scoped = fixKwd(p->scoped());
     ClassList bases = p->bases();
@@ -6434,12 +6463,13 @@ Slice::Gen::Cpp11LocalObjectVisitor::visitClassDefStart(const ClassDefPtr& p)
         bool virtualInheritance = p->isInterface();
         while(q != bases.end())
         {
+            H << "public ";
             if(virtualInheritance || (*q)->isInterface())
             {
                 H << "virtual ";
             }
 
-            H << "public " << fixKwd((*q)->scoped());
+            H << fixKwd((*q)->scoped());
             if(++q != bases.end())
             {
                 H << ',' << nl;
@@ -6588,7 +6618,7 @@ Slice::Gen::Cpp11LocalObjectVisitor::visitOperation(const OperationPtr& p)
     int typeCtx = _useWstring | TypeContextLocal | TypeContextCpp11;
     TypePtr ret = p->returnType();
     string retS = returnTypeToString(ret, p->returnIsOptional(), p->getMetaData(),
-                                     typeCtx | TypeContextCpp11);
+                                     typeCtx);
 
     string params = "(";
     string paramsDecl = "(";
@@ -6647,8 +6677,6 @@ Slice::Gen::Cpp11LocalObjectVisitor::visitOperation(const OperationPtr& p)
 
     string deprecateSymbol = getDeprecateSymbol(p, cl);
 
-    H << sp;
-    H << nl << deprecateSymbol << "virtual " << retS << ' ' << fixKwd(name) << params << isConst << noExcept << " = 0;";
 
     if(cl->hasMetaData("async-oneway") || p->hasMetaData("async-oneway"))
     {
@@ -6671,6 +6699,13 @@ Slice::Gen::Cpp11LocalObjectVisitor::visitOperation(const OperationPtr& p)
         }
 
         H << sp;
+        H << nl << deprecateSymbol << "virtual " << retS << ' ' << fixKwd(name) << spar << paramsDeclAMI << epar
+                << isConst << noExcept;
+        H << sb;
+        H << nl << name << "Async" << spar << paramsArgAMI << epar << ".get();";
+        H << eb;
+
+        H << sp;
         H << nl << "virtual ::std::function<void()>";
         H << nl << name << "Async(";
         H.useCurrentPosAsIndent();
@@ -6690,10 +6725,10 @@ Slice::Gen::Cpp11LocalObjectVisitor::visitOperation(const OperationPtr& p)
         H << nl << "template<template<typename> class P = ::std::promise>";
         H << nl << deprecateSymbol << "auto " << name << "Async" << spar << paramsDeclAMI << epar;
         H.inc();
-        H << nl << "-> decltype(::std::declval<P<bool>>().get_future())";
+        H << nl << "-> decltype(::std::declval<P<void>>().get_future())";
         H.dec();
         H << sb;
-        H << nl << "using Promise = P<bool>;";
+        H << nl << "using Promise = P<void>;";
         H << nl << "auto promise = ::std::make_shared<Promise>();";
 
         H << nl << name << "Async(";
@@ -6710,14 +6745,19 @@ Slice::Gen::Cpp11LocalObjectVisitor::visitOperation(const OperationPtr& p)
         H << sb;
         H << nl << "promise->set_exception(::std::move(ex));";
         H << eb << ",";
-        H << nl << "[promise](bool b)";
+        H << nl << "[promise](bool)";
         H << sb;
-        H << nl << "promise->set_value(b);";
+        H << nl << "promise->set_value();";
         H << eb << ");";
         H.restoreIndent();
 
         H << nl << "return promise->get_future();";
         H << eb;
+    }
+    else
+    {
+        H << sp;
+        H << nl << deprecateSymbol << "virtual " << retS << ' ' << fixKwd(name) << params << isConst << noExcept << " = 0;";
     }
 }
 
@@ -7468,7 +7508,7 @@ Slice::Gen::Cpp11ObjectVisitor::emitOneShotConstructor(const ClassDefPtr& p)
     {
         vector<string> allParamDecls;
         DataMemberList dataMembers = p->dataMembers();
-        
+
         int typeContext = _useWstring | TypeContextCpp11;
         if(p->isLocal())
         {

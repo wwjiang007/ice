@@ -325,7 +325,7 @@ public final class ConnectionI extends com.zeroc.IceInternal.EventHandler
            (acm.heartbeat != ACMHeartbeat.HeartbeatOff && _writeStream.isEmpty() &&
             now >= (_acmLastActivity + acm.timeout / 4)))
         {
-            if(acm.heartbeat != ACMHeartbeat.HeartbeatOnInvocation || _dispatchCount > 0)
+            if(acm.heartbeat != ACMHeartbeat.HeartbeatOnDispatch || _dispatchCount > 0)
             {
                 sendHeartbeatNow();
             }
@@ -713,50 +713,19 @@ public final class ConnectionI extends com.zeroc.IceInternal.EventHandler
     @Override
     public void sendResponse(int requestId, OutputStream os, byte compressFlag, boolean amd)
     {
-        boolean queueResponse = false;
+        //
+        // We may be executing on the "main thread" (e.g., in Android together with a custom dispatcher)
+        // and therefore we have to defer network calls to a separate thread.
+        //
+        final boolean queueResponse = _instance.queueRequests();
 
         synchronized(this)
         {
-            assert (_state > StateNotValidated);
+            assert(_state > StateNotValidated);
 
-            try
+            if(!queueResponse)
             {
-                if(--_dispatchCount == 0)
-                {
-                    if(_state == StateFinished)
-                    {
-                        reap();
-                    }
-                    notifyAll();
-                }
-
-                if(_state >= StateClosed)
-                {
-                    assert (_exception != null);
-                    throw (LocalException) _exception.fillInStackTrace();
-                }
-
-                //
-                // We may be executing on the "main thread" (e.g., in Android together with a custom dispatcher)
-                // and therefore we have to defer network calls to a separate thread.
-                //
-                if(_instance.queueRequests())
-                {
-                    queueResponse = true;
-                }
-                else
-                {
-                    sendMessage(new OutgoingMessage(os, compressFlag != 0, true));
-
-                    if(_state == StateClosing && _dispatchCount == 0)
-                    {
-                        initiateShutdown();
-                    }
-                }
-            }
-            catch(LocalException ex)
-            {
-                setState(StateClosed, ex);
+                sendResponseImpl(os, compressFlag);
             }
         }
 
@@ -768,25 +737,39 @@ public final class ConnectionI extends com.zeroc.IceInternal.EventHandler
                 public Void call()
                     throws Exception
                 {
-                    synchronized(ConnectionI.this)
-                    {
-                        try
-                        {
-                            sendMessage(new OutgoingMessage(os, compressFlag != 0, true));
-
-                            if(_state == StateClosing && _dispatchCount == 0)
-                            {
-                                initiateShutdown();
-                            }
-                        }
-                        catch(LocalException ex)
-                        {
-                            setState(StateClosed, ex);
-                        }
-                    }
+                    sendResponseImpl(os, compressFlag);
                     return null;
                 }
             });
+        }
+    }
+
+    private synchronized void sendResponseImpl(OutputStream os, byte compressFlag)
+    {
+        try
+        {
+            if(--_dispatchCount == 0)
+            {
+                if(_state == StateFinished)
+                {
+                    reap();
+                }
+                notifyAll();
+            }
+
+            if(_state < StateClosed)
+            {
+                sendMessage(new OutgoingMessage(os, compressFlag != 0, true));
+
+                if(_state == StateClosing && _dispatchCount == 0)
+                {
+                    initiateShutdown();
+                }
+            }
+        }
+        catch(LocalException ex)
+        {
+            setState(StateClosed, ex);
         }
     }
 
@@ -1635,6 +1618,11 @@ public final class ConnectionI extends com.zeroc.IceInternal.EventHandler
     public synchronized void exception(LocalException ex)
     {
         setState(StateClosed, ex);
+    }
+
+    public com.zeroc.IceInternal.ThreadPool getThreadPool()
+    {
+        return _threadPool;
     }
 
     public ConnectionI(Communicator communicator, com.zeroc.IceInternal.Instance instance,

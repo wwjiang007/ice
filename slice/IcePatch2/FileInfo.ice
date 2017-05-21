@@ -9,7 +9,7 @@
 
 #pragma once
 
-[["ice-prefix", "cpp:header-ext:h", "cpp:dll-export:ICEPATCH2_API", "objc:header-dir:objc"]]
+[["ice-prefix", "cpp:header-ext:h", "cpp:dll-export:ICEPATCH2_API", "objc:header-dir:objc", "python:pkgdir:IcePatch2"]]
 [["cpp:include:IcePatch2/Config.h"]]
 
 #include <Ice/BuiltinSequences.ice>
@@ -40,7 +40,7 @@ struct FileInfo
 
     /** The executable flag. */
     bool executable;
-};
+}
 
 /**
  *
@@ -68,7 +68,7 @@ struct LargeFileInfo
 
     /** The executable flag. */
     bool executable;
-};
+}
 
 /**
  *
@@ -77,4 +77,4 @@ struct LargeFileInfo
  **/
 sequence<LargeFileInfo> LargeFileInfoSeq;
 
-};
+}

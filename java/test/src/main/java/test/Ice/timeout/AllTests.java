@@ -258,9 +258,9 @@ public class AllTests
         out.print("testing close timeout... ");
         out.flush();
         {
-            TimeoutPrx to = TimeoutPrx.checkedCast(obj.ice_timeout(100 * mult));
+            TimeoutPrx to = TimeoutPrx.checkedCast(obj.ice_timeout(250 * mult));
             com.zeroc.Ice.Connection connection = to.ice_getConnection();
-            timeout.holdAdapter(500);
+            timeout.holdAdapter(600);
             connection.close(com.zeroc.Ice.ConnectionClose.GracefullyWithWait);
             try
             {
@@ -272,7 +272,7 @@ public class AllTests
             }
             try
             {
-                Thread.sleep(500 * mult);
+                Thread.sleep(650 * mult);
             }
             catch(java.lang.InterruptedException ex)
             {
@@ -377,6 +377,19 @@ public class AllTests
             //
             timeout.op(); // Ensure adapter is active.
             to = to.ice_timeout(250);
+            int nRetry = 5;
+            while(--nRetry > 0)
+            {
+                try
+                {
+                    to.ice_getConnection();
+                    break;
+                }
+                catch(com.zeroc.Ice.ConnectTimeoutException ex)
+                {
+                    // Can sporadically occur with slow machines
+                }
+            }
             to.ice_getConnection(); // Establish connection
             timeout.holdAdapter(750 * mult);
             try

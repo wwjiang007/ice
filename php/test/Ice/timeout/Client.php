@@ -159,7 +159,7 @@ function allTests($communicator)
         }
 
         $timeout->ice_ping();
-        $to = $timeout->ice_invocationTimeout(500)->ice_checkedCast("::Test::Timeout");
+        $to = $timeout->ice_invocationTimeout(1000)->ice_checkedCast("::Test::Timeout");
         test($connection == $to->ice_getConnection());
         try
         {
@@ -167,6 +167,7 @@ function allTests($communicator)
         }
         catch(Exception $ex)
         {
+            echo($ex);
             test(false);
         }
         test($connection == $to->ice_getConnection());
@@ -206,9 +207,9 @@ function allTests($communicator)
     echo("testing close timeout... ");
     flush();
     {
-        $to = $timeout->ice_timeout(100)->ice_uncheckedCast("::Test::Timeout");
+        $to = $timeout->ice_timeout(250)->ice_uncheckedCast("::Test::Timeout");
         $connection = $to->ice_getConnection();
-        $timeout->holdAdapter(500);
+        $timeout->holdAdapter(600);
         $connection->close($CloseGracefullyAndWait);
         try
         {
@@ -218,7 +219,7 @@ function allTests($communicator)
         {
             test(false);
         }
-        usleep(500 * 1000);
+        usleep(650 * 1000);
         try
         {
             $connection->getInfo();
@@ -332,6 +333,24 @@ function allTests($communicator)
         //
         $timeout->op(); // Ensure adapter is active.
         $to = $to->ice_timeout(250)->ice_uncheckedCast("::Test::Timeout");
+        $nRetry = 5;
+        while(--$nRetry > 0)
+        {
+            try
+            {
+                $to->ice_getConnection(); // Establish connection.
+                break;
+            }
+            catch(Exception $ex)
+            {
+                if($ex instanceof $ConnectTimeoutException)
+                {
+                    // Can sporadically occur with slow machines
+                }
+                echo($ex);
+                test(false);
+            }
+        }
         $to->ice_getConnection(); // Establish connection.
         $timeout->holdAdapter(750);
         try

@@ -95,16 +95,16 @@ def allTests(communicator)
 
     print "testing close timeout... "
     STDOUT.flush
-    to = Test::TimeoutPrx.checkedCast(obj.ice_timeout(100))
+    to = Test::TimeoutPrx.checkedCast(obj.ice_timeout(250))
     connection = to.ice_getConnection()
-    timeout.holdAdapter(500)
+    timeout.holdAdapter(600)
     connection.close(Ice::ConnectionClose::GracefullyWithWait)
     begin
         connection.getInfo() # getInfo() doesn't throw in the closing state.
     rescue Ice::LocalException
         test(false)
     end
-    sleep(0.5)
+    sleep(0.65)
     begin
         connection.getInfo()
         test(false)
@@ -181,6 +181,16 @@ def allTests(communicator)
     #
     timeout.op() # Ensure adapter is active.
     to = Test::TimeoutPrx::uncheckedCast(to.ice_timeout(250))
+    nRetry = 5
+    while nRetry > 0 do
+        nRetry -=1
+        begin
+            to.ice_getConnection() # Establish connection.
+            break
+        rescue Ice::ConnectTimeoutException
+            # Can sporadically occur with slow machines
+        end
+    end
     to.ice_getConnection() # Establish connection.
     timeout.holdAdapter(750)
     begin

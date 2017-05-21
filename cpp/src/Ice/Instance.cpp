@@ -1129,7 +1129,7 @@ IceInternal::Instance::Instance(const CommunicatorPtr& communicator, const Initi
             else
             {
                 _initData.logger = getProcessLogger();
-                if(ICE_DYNAMIC_CAST(Logger, _initData.logger))
+                if(ICE_DYNAMIC_CAST(LoggerI, _initData.logger))
                 {
                     _initData.logger = ICE_MAKE_SHARED(LoggerI, _initData.properties->getProperty("Ice.ProgramName"), "", logStdErrConvert);
                 }
@@ -1351,20 +1351,10 @@ IceInternal::Instance::finishSetup(int& argc, const char* argv[], const Ice::Com
     pluginManagerImpl->loadPlugins(argc, argv);
 
     //
-    // Add WS and WSS endpoint factories if TCP/SSL factories are installed.
+    // Initialize the endpoint factories once all the plugins are loaded. This gives
+    // the opportunity for the endpoint factories to find underyling factories.
     //
-    EndpointFactoryPtr tcpFactory = _endpointFactoryManager->get(TCPEndpointType);
-    if(tcpFactory)
-    {
-        ProtocolInstancePtr instance = new ProtocolInstance(communicator, WSEndpointType, "ws", false);
-        _endpointFactoryManager->add(new WSEndpointFactory(instance, tcpFactory->clone(instance, 0)));
-    }
-    EndpointFactoryPtr sslFactory = _endpointFactoryManager->get(SSLEndpointType);
-    if(sslFactory)
-    {
-        ProtocolInstancePtr instance = new ProtocolInstance(communicator, WSSEndpointType, "wss", true);
-        _endpointFactoryManager->add(new WSEndpointFactory(instance, sslFactory->clone(instance, 0)));
-    }
+    _endpointFactoryManager->initialize();
 
     //
     // Reset _stringConverter and _wstringConverter, in case a plugin changed them
