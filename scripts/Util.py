@@ -242,9 +242,9 @@ class Windows(Platform):
                      "Ice/properties",          # Property files are not supported with UWP
                      "Ice/plugin",
                      "Ice/threadPoolPriority"])
-        elif self.getCompiler() in ["v100"]:
+        elif self.getCompiler() in ["VC100"]:
             return (["cpp/Ice/.*", "cpp/IceSSL/.*", "cpp/IceBox/.*", "cpp/IceDiscovery/.*", "cpp/IceUtil/.*", "cpp/Slice/.*"], [])
-        elif self.getCompiler() not in ["v140"]:
+        elif self.getCompiler() not in ["VC140"]:
             return ([], ["python", "php", "ruby"])
         else:
             return ([], ["ruby"])
@@ -267,18 +267,21 @@ class Windows(Platform):
             try:
                 out = run("cl")
                 if out.find("Version 16.") != -1:
-                    self.compiler = "v100"
+                    self.compiler = "VC100"
                 elif out.find("Version 17.") != -1:
-                    self.compiler = "v110"
+                    self.compiler = "VC110"
                 elif out.find("Version 18.") != -1:
-                    self.compiler = "v120"
+                    self.compiler = "VC120"
                 elif out.find("Version 19.00.") != -1:
-                    self.compiler = "v140"
+                    self.compiler = "VC140"
                 elif out.find("Version 19.10.") != -1:
-                    self.compiler = "v141"
+                    self.compiler = "VC141"
             except:
                 pass
         return self.compiler
+
+    def getPlatformToolset(self):
+        return self.getCompiler().replace("VC", "v")
 
     def getBinSubDir(self, mapping, process, current):
         #
@@ -290,11 +293,11 @@ class Windows(Platform):
 
         if current.driver.useIceBinDist(mapping):
             compiler = self.getCompiler()
-            v140 = compiler == "v140"
+            vc140 = compiler == "VC140"
             cpp = isinstance(mapping, CppMapping)
             csharp = isinstance(mapping, CSharpMapping)
 
-            if ((cpp and v140 and platform == "x64" and buildConfig == "Release") or
+            if ((cpp and vc140 and platform == "x64" and buildConfig == "Release") or
                 (not csharp and not cpp) or
                 (not compiler)):
                 return "bin"
@@ -338,10 +341,10 @@ class Windows(Platform):
 
         with open(os.path.join(toplevel, "config", "icebuilder.props"), "r") as configFile:
             version = re.search("<IceJSONVersion>(.*)</IceJSONVersion>", configFile.read()).group(1)
-        comp = self.getCompiler() if isinstance(mapping, CppMapping) else "net"
 
+        packageSuffix = self.getPlatformToolset() if isinstance(mapping, CppMapping) else "net"
         compiler = self.getCompiler()
-        v140 = compiler == "v140"
+        vc140 = compiler == "VC140"
         cpp = isinstance(mapping, CppMapping)
         csharp = isinstance(mapping, CSharpMapping)
 
@@ -349,7 +352,7 @@ class Windows(Platform):
         # Use binary distribution from ICE_HOME if building for C++/VC140/x64/Release or
         # for another mapping than C++ or C#.
         #
-        if ((cpp and v140 and platform == "x64" and current.config.buildConfig == "Release") or
+        if ((cpp and vc140 and platform == "x64" and current.config.buildConfig == "Release") or
             (not csharp and not cpp) or
             (not compiler)):
             return os.environ.get("ICE_HOME")
@@ -357,7 +360,7 @@ class Windows(Platform):
         #
         # Otherwise, use the appropriate nuget package
         #
-        return os.path.join(mapping.path, "msbuild", "packages", "{0}".format(mapping.getNugetPackage(comp, version)))
+        return os.path.join(mapping.path, "msbuild", "packages", "{0}".format(mapping.getNugetPackage(packageSuffix, version)))
 
     def canRun(self, mapping, current):
         #
@@ -394,12 +397,15 @@ def parseOptions(obj, options, mapped={}):
     for (o, a) in options:
         if o.startswith("--"): o = o[2:]
         if o.startswith("-"): o = o[1:]
+        if not a and o.startswith("no-"):
+            a = "false"
+            o = o[3:]
         if o in mapped:
             o = mapped[o]
 
         if hasattr(obj, o):
             if isinstance(getattr(obj, o), bool):
-                setattr(obj, o, a.lower() in ("yes", "true", "1") if a else True)
+                setattr(obj, o, True if not a else (a.lower() in ["yes", "true", "1"]))
             elif isinstance(getattr(obj, o), list):
                 l = getattr(obj, o)
                 l.append(a)
@@ -440,7 +446,7 @@ class Mapping:
 
         @classmethod
         def getSupportedArgs(self):
-            return ("", ["config=", "platform=", "protocol=", "compress", "ipv6", "serialize", "mx",
+            return ("", ["config=", "platform=", "protocol=", "compress", "ipv6", "no-ipv6", "serialize", "mx",
                          "cprops=", "sprops="])
 
         @classmethod
@@ -543,7 +549,8 @@ class Mapping:
                         v = next(v)
                         if v:
                             if type(v) == bool:
-                                options.append(("--{0}".format(k), None))
+                                if v:
+                                    options.append(("--{0}".format(k), None))
                             else:
                                 options.append(("--{0}".format(k), v))
 
@@ -551,7 +558,8 @@ class Mapping:
                     for o in self.parsedOptions:
                         v = getattr(self, o)
                         if type(v) == bool:
-                            options.append(("--{0}".format(o), None))
+                            if v:
+                                options.append(("--{0}".format(o), None))
                         elif type(v) == list:
                             options += [("--{0}".format(o), e) for e in v]
                         else:
@@ -2011,7 +2019,7 @@ class AndroidProcessController(RemoteProcessController):
     def startControllerApp(self, current, ident):
         if current.config.avd:
             self.startEmulator(current.config)
-        run("{} install -r test/controller/build/outputs/apk/testController-debug.apk".format(self.adb()))
+        run("{} install -t -r {}".format(self.adb(), current.config.apk))
         run("{} shell am start -n com.zeroc.testcontroller/.ControllerActivity".format(self.adb()))
 
     def stopControllerApp(self, ident):
@@ -2072,12 +2080,13 @@ class iOSSimulatorProcessController(RemoteProcessController):
                 return "iPhoneSimulator/com.zeroc.ObjC-ARC-Test-Controller"
             else:
                 return "iPhoneSimulator/com.zeroc.ObjC-Test-Controller"
-        else:
-            assert(isinstance(current.testcase.getMapping(), CppMapping))
+        elif isinstance(current.testcase.getMapping(), CppMapping):
             if current.config.cpp11:
                 return "iPhoneSimulator/com.zeroc.Cpp11-Test-Controller"
             else:
                 return "iPhoneSimulator/com.zeroc.Cpp98-Test-Controller"
+        else:
+            raise RuntimeError("can't run tests from the `{0}' mapping on iOS".format(current.testcase.getMapping()))
 
     def startControllerApp(self, current, ident):
         mapping = current.testcase.getMapping()
@@ -2535,7 +2544,7 @@ class Driver:
         initData.properties.setProperty("Ice.Default.Host", self.interface)
         initData.properties.setProperty("Ice.ThreadPool.Server.Size", "10")
         #initData.properties.setProperty("Ice.Trace.Protocol", "1")
-        #initData.properties.setProperty("Ice.Trace.Network", "2")
+        #initData.properties.setProperty("Ice.Trace.Network", "3")
         initData.properties.setProperty("Ice.Override.Timeout", "10000")
         initData.properties.setProperty("Ice.Override.ConnectTimeout", "1000")
         self.communicator = Ice.initialize(initData)
@@ -2801,11 +2810,41 @@ class Android:
 
 class AndroidMapping(JavaMapping):
 
+    class Config(Mapping.Config):
+
+        @classmethod
+        def getSupportedArgs(self):
+            return ("", ["device=", "avd=", "androidemulator"])
+
+        @classmethod
+        def usage(self):
+            print("")
+            print("Android Mapping options:")
+            print("--device=<device-id>      Id of the emulator or device used to run the tests.")
+            print("--androidemulator         Run tests in emulator as opposed to a real device.")
+            print("--avd                     Start emulator image")
+
+        def __init__(self, options=[]):
+            Mapping.Config.__init__(self, options)
+
+            parseOptions(self, options, { "device" : "device", "avd" : "avd" })
+            self.androidemulator = self.androidemulator or self.avd
+            self.apk = "controller/build/outputs/apk/debug/testController-debug.apk"
+
+    def getSSLProps(self, process, current):
+        props = JavaMapping.getSSLProps(self, process, current)
+        props.update({
+            "IceSSL.KeystoreType" : "BKS",
+            "IceSSL.TruststoreType" : "BKS",
+            "Ice.InitPlugins" : "0",
+            "IceSSL.Keystore": "server.bks" if isinstance(process, Server) else "client.bks"})
+        return props
+
     def getTestsPath(self):
         return os.path.join(self.path, "../java/test/src/main/java/test")
 
     def filterTestSuite(self, testId, config, filters=[], rfilters=[]):
-        if not testId.startswith("Ice/"):
+        if not testId.startswith("Ice/") or testId in Android.getUnsuportedTests(config.protocol):
             return True
         return JavaMapping.filterTestSuite(self, testId, config, filters, rfilters)
 
@@ -2830,6 +2869,7 @@ class AndroidCompatMapping(JavaCompatMapping):
 
             parseOptions(self, options, { "device" : "device", "avd" : "avd" })
             self.androidemulator = self.androidemulator or self.avd
+            self.apk = "test/controller/build/outputs/apk/testController-debug.apk"
 
     def getSSLProps(self, process, current):
         props = JavaCompatMapping.getSSLProps(self, process, current)
@@ -2885,7 +2925,7 @@ class CSharpMapping(Mapping):
             assembliesDir = os.path.join(platform.getIceInstallDir(self, current), "lib")
         else:
             bzip2 = os.path.join(toplevel, "cpp", "msbuild", "packages",
-                                 "bzip2.{0}.1.0.6.7".format(platform.getCompiler()),
+                                 "bzip2.{0}.1.0.6.7".format(platform.getPlatformToolset()),
                                  "build", "native", "bin", "x64", "Release")
             assembliesDir = os.path.join(current.driver.getIceDir(self, current), "Assemblies")
         return { "DEVPATH" : assembliesDir, "PATH" : bzip2 };

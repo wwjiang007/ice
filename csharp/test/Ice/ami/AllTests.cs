@@ -1291,7 +1291,7 @@ public class AllTests : TestCommon.AllTests
                 r = ((Test.TestIntfPrx)p.ice_oneway()).begin_opWithResult();
                 test(false);
             }
-            catch(System.ArgumentException)
+            catch(Ice.TwowayOnlyException)
             {
             }
 
@@ -1343,7 +1343,7 @@ public class AllTests : TestCommon.AllTests
                 ((Test.TestIntfPrx)p.ice_oneway()).opWithResultAsync();
                 test(false);
             }
-            catch(System.ArgumentException)
+            catch(Ice.TwowayOnlyException)
             {
             }
 
@@ -3807,8 +3807,7 @@ public class AllTests : TestCommon.AllTests
 
             if(!collocated)
             {
-                communicator.getProperties().setProperty("ReplyAdapter.Endpoints", "tcp");
-                Ice.ObjectAdapter adapter = communicator.createObjectAdapter("ReplyAdapter");
+                Ice.ObjectAdapter adapter = communicator.createObjectAdapter("");
                 PingReplyI replyI = new PingReplyI();
                 Test.PingReplyPrx reply = Test.PingReplyPrxHelper.uncheckedCast(adapter.addWithUUID(replyI));
                 adapter.activate();
@@ -3816,7 +3815,22 @@ public class AllTests : TestCommon.AllTests
                 p.ice_getConnection().setAdapter(adapter);
                 p.pingBiDir(reply.ice_getIdentity());
                 replyI.waitReply(1, 100);
+                adapter.destroy();
             }
+        }
+        WriteLine("ok");
+
+        Write("testing result struct... ");
+        Flush();
+        {
+            var q = Test.Outer.Inner.TestIntfPrxHelper.uncheckedCast(
+                communicator.stringToProxy("test2:" + app.getTestEndpoint(0)));
+            q.opAsync(1).ContinueWith(t =>
+                {
+                    var r = t.Result;
+                    test(r.returnValue == 1);
+                    test(r.j == 1);
+                }).Wait();
         }
         WriteLine("ok");
 

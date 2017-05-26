@@ -2565,6 +2565,19 @@ allTests(const CommunicatorPtr& communicator, const string& testDir, bool p12)
     //
 #ifndef ICE_OS_UWP
     cout << "testing ciphers... " << flush;
+    {
+        InitializationData initData;
+        initData.properties = createClientProps(defaultProps, p12, "c_rsa_ca1", "cacert1");
+        initData.properties->setProperty("IceSSL.Ciphers", "UNKNOWN");
+        try
+        {
+            initialize(initData);
+            test(false);
+        }
+        catch(const Ice::PluginInitializationException&)
+        {
+        }
+    }
 #  ifndef ICE_USE_SCHANNEL
     {
         //
@@ -2867,16 +2880,14 @@ allTests(const CommunicatorPtr& communicator, const string& testDir, bool p12)
     //
     // No DSA support in Secure Transport / AIX 7.1
     //
-#  if !defined(ICE_USE_SECURE_TRANSPORT) && !defined(_AIX)
+#  if !defined(ICE_USE_SECURE_TRANSPORT) && !defined(_AIX) && !defined(ICE_USE_SCHANNEL)
     {
+        //
+        // DSA PEM keys are not supported with SChannel. Since Windows 10
+        // Creator Update DHE_DSS is also disabled by default so DSA keys
+        // can no longer be used.
+        //
 
-    //
-    // DSA PEM certificates are not supported with SChannel.
-    //
-#    ifdef ICE_USE_SCHANNEL
-    if(p12)
-    {
-#    endif
         //
         // Configure a server with RSA and DSA certificates.
         //
@@ -2935,11 +2946,7 @@ allTests(const CommunicatorPtr& communicator, const string& testDir, bool p12)
         }
         fact->destroyServer(server);
         comm->destroy();
-#    ifdef ICE_USE_SCHANNEL
-    }
-#    endif
 
-#    ifndef ICE_USE_SCHANNEL
         //
         // Next try a client with ADH. This should fail.
         //
@@ -2969,9 +2976,8 @@ allTests(const CommunicatorPtr& communicator, const string& testDir, bool p12)
         }
         fact->destroyServer(server);
         comm->destroy();
-#    endif
     }
-#    ifndef ICE_USE_SCHANNEL
+
     {
         //
         // Configure a server with RSA and a client with DSA. This should fail.
@@ -3008,8 +3014,7 @@ allTests(const CommunicatorPtr& communicator, const string& testDir, bool p12)
         fact->destroyServer(server);
         comm->destroy();
     }
-#    endif
-#  endif
+#   endif
     cout << "ok" << endl;
 #endif
 

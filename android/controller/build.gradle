@@ -11,12 +11,18 @@ apply plugin: 'com.android.application'
 apply from: "$rootProject.projectDir/../java/gradle/ice.gradle"
 apply from: "$rootProject.projectDir/gradle/tests.gradle"
 
+slice {
+    java {
+        files = fileTree(dir: "$rootProject.projectDir/../scripts/", includes: ['*.ice'])
+    }
+}
+
 android {
     compileSdkVersion ice_compileSdkVersion.toInteger()
     buildToolsVersion ice_buildToolsVersion
 
     defaultConfig {
-        applicationId "com.zeroc.test"
+        applicationId "com.zeroc.testcontroller"
         minSdkVersion ice_minSdkVersion.toInteger()
         targetSdkVersion ice_targetSdkVersion.toInteger()
         multiDexEnabled true // Necessary otherwise we'd exceed the 64K DEX limit.
@@ -65,6 +71,7 @@ dependencies {
     compile localDependency('icessl')
     compile project(':test')
     tests.each {
-        compile project(":test_Ice_${it}")
+        def name = it.replace('/', '_')
+        compile project(":test_${name}")
     }
 }
