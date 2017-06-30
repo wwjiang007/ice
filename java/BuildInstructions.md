@@ -9,7 +9,7 @@ platforms.
 ### Operating Systems
 
 Ice for Java is expected to build and run properly on Windows, macOS, and any
-recent Linux distribution for x86 and x86_64, and was extensively tested using
+recent Linux distribution for x86_64 (or ix86), and was extensively tested using
 the operating systems and compiler versions listed for our [supported
 platforms][2]. Due to the portability of Java, it is very likely that it will
 also work on other platforms for which a suitable Java implementation is
@@ -43,21 +43,21 @@ distribution without an Internet connection. Gradle will download all required
 distribution without an Internet connection. Gradle will download all required
 packages automatically from ZeroC's Maven repository located at
 
-    http://repo.zeroc.com/nexus/content/repositories/thirdparty
+    https://repo.zeroc.com/nexus/content/repositories/thirdparty
 
 ### Bzip2 Compression
 
 Ice for Java supports protocol compression using the bzip2 classes included
-with Apache Ant or available separately from [kohsuke.org]().
+with [Apache Commons Compress][5].
 
-The Maven package id for the bzip2 JAR file is as follows:
+The Maven package id for the commons-compress JAR file is as follows:
 
-    groupId=org.apache.tools, version=1.0, artifactId=bzip2
+    groupId=org.apache.commons, version=1.14, artifactId=commons-compress
 
 The demos and tests are automatically setup to enable protocol compression by
-adding the bzip2 JAR to the manifest class path. For your own applications you
-must add the bzip2 JAR to the application CLASSPATH to enable protocol
-compression.
+adding the commons-compress JAR to the manifest class path. For your own
+applications you must add the commons-compress JAR to the application CLASSPATH
+to enable protocol compression.
 
 > *These classes are a pure Java implementation of the bzip2 algorithm and
 therefore add significant latency to Ice requests.*
@@ -102,12 +102,12 @@ not built Ice for C++ in this source distribution, you must set the `ICE_HOME`
 environment variable with the path name of your Ice installation. For example,
 on Unix:
 
-    $ export ICE_HOME=/opt/Ice-3.7b0 (For local build)
+    $ export ICE_HOME=/opt/Ice-3.7.0 (For local build)
     $ export ICE_HOME=/usr (For RPM installation)
 
 On Windows:
 
-    > set ICE_HOME=C:\Program Files (x86)\ZeroC\Ice-3.7b0 (MSI installation)
+    > set ICE_HOME=C:\Program Files\ZeroC\Ice-3.7.0 (MSI installation on Windows)
 
 On Windows if you are using Ice for C++ from a source distribution, you must
 set the `CPP_PLATFORM` and `CPP_CONFIGURATION` environment variables to match the
@@ -167,12 +167,12 @@ C++ distribution. If you have not built Ice for C++ in this source distribution
 then you must set the `ICE_HOME` environment variable with the path name of your
 Ice installation. On Unix:
 
-    $ export ICE_HOME=/opt/Ice-3.7b0 (For local build)
+    $ export ICE_HOME=/opt/Ice-3.7.0 (For local build)
     $ export ICE_HOME=/usr (For RPM installation)
 
 On Windows:
 
-    > set ICE_HOME=C:\Program Files\ZeroC\Ice-3.7b0
+    > set ICE_HOME=C:\Program Files\ZeroC\Ice-3.7.0
 
 Python is required to run the test suite. To run the tests, open a command
 window and change to the top-level directory. At the command prompt, execute:
@@ -196,6 +196,7 @@ On macOS, the build also creates an application bundle named IceGrid GUI.
 You can start the IceGrid GUI tool by double-clicking the IceGrid GUI icon in Finder.
 
 [1]: https://zeroc.com/distributions/ice
-[2]: https://doc.zeroc.com/display/Ice37/Supported+Platforms+for+Ice+3.7.0
-[3]: http://gradle.org
+[2]: https://doc.zeroc.com/display/Rel/Supported+Platforms+for+Ice+3.7.0
+[3]: https://gradle.org
 [4]: http://proguard.sourceforge.net
+[5]: https://commons.apache.org/proper/commons-compress/

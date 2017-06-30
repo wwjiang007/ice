@@ -123,7 +123,6 @@ public class AllTests
         X509Certificate2 caCert1 = new X509Certificate2(caCert1File);
         X509Certificate2 caCert2 = new X509Certificate2(caCert2File);
 
-
         test(Enumerable.SequenceEqual(IceSSL.Util.createCertificate(File.ReadAllText(caCert1File)).RawData, caCert1.RawData));
         test(Enumerable.SequenceEqual(IceSSL.Util.createCertificate(File.ReadAllText(caCert2File)).RawData, caCert2.RawData));
 
@@ -162,8 +161,9 @@ public class AllTests
                 {
                     // Expected.
                 }
-                catch(Ice.LocalException)
+                catch(Ice.LocalException ex)
                 {
+                    Console.WriteLine(ex.ToString());
                     test(false);
                 }
                 comm.destroy();
@@ -183,8 +183,9 @@ public class AllTests
                 {
                     server.ice_ping();
                 }
-                catch(Ice.LocalException)
+                catch(Ice.LocalException ex)
                 {
+                    Console.WriteLine(ex.ToString());
                     test(false);
                 }
                 fact.destroyServer(server);
@@ -216,8 +217,9 @@ public class AllTests
                 {
                     server.ice_ping();
                 }
-                catch(Ice.LocalException)
+                catch(Ice.LocalException ex)
                 {
+                    Console.WriteLine(ex.ToString());
                     test(false);
                 }
                 fact.destroyServer(server);
@@ -326,8 +328,9 @@ public class AllTests
                 {
                     server.noCert();
                 }
-                catch(Ice.LocalException)
+                catch(Ice.LocalException ex)
                 {
+                    Console.WriteLine(ex.ToString());
                     test(false);
                 }
                 fact.destroyServer(server);
@@ -468,8 +471,9 @@ public class AllTests
                 {
                     // Expected.
                 }
-                catch(Ice.LocalException)
+                catch(Ice.LocalException ex)
                 {
+                    Console.WriteLine(ex.ToString());
                     test(false);
                 }
                 fact.destroyServer(server);
@@ -526,7 +530,6 @@ public class AllTests
                 fact.destroyServer(server);
                 comm.destroy();
 
-
                 //
                 // Verify that IceSSL.CheckCertName has no effect in a server.
                 //
@@ -578,8 +581,9 @@ public class AllTests
                         {
                             server.ice_ping();
                         }
-                        catch(Ice.LocalException)
+                        catch(Ice.LocalException ex)
                         {
+                            Console.WriteLine(ex.ToString());
                             test(false);
                         }
                         fact.destroyServer(server);
@@ -628,8 +632,9 @@ public class AllTests
                         {
                             server.ice_ping();
                         }
-                        catch(Ice.LocalException)
+                        catch(Ice.LocalException ex)
                         {
+                            Console.WriteLine(ex.ToString());
                             test(false);
                         }
                         fact.destroyServer(server);
@@ -693,6 +698,10 @@ public class AllTests
                     //
 
                     //
+                    // Disabled for compatibility with older Windows
+                    // versions.
+                    //
+                    /* //
                     // Target host matches the certificate IP altName
                     //
                     {
@@ -740,7 +749,7 @@ public class AllTests
                         }
                         fact.destroyServer(server);
                         comm.destroy();
-                    }
+                    }*/
                     //
                     // Target host is an IP addres that matches the CN and the certificate doesn't
                     // include an IP altName.
@@ -759,8 +768,9 @@ public class AllTests
                         {
                             server.ice_ping();
                         }
-                        catch(Ice.SecurityException)
+                        catch(Ice.SecurityException ex)
                         {
+                            Console.WriteLine(ex.ToString());
                             test(false);
                         }
                         fact.destroyServer(server);
@@ -785,8 +795,9 @@ public class AllTests
                         {
                             server.ice_ping();
                         }
-                        catch(Ice.LocalException)
+                        catch(Ice.LocalException ex)
                         {
+                            Console.WriteLine(ex.ToString());
                             test(false);
                         }
                         fact.destroyServer(server);
@@ -832,8 +843,9 @@ public class AllTests
                         test(info.certs.Length == 1);
                         test(!info.verified);
                     }
-                    catch(Ice.LocalException)
+                    catch(Ice.LocalException ex)
                     {
+                        Console.WriteLine(ex.ToString());
                         test(false);
                     }
                     fact.destroyServer(server);
@@ -851,8 +863,9 @@ public class AllTests
                         test(info.certs.Length == 1);
                         test(!info.verified);
                     }
-                    catch(Ice.LocalException)
+                    catch(Ice.LocalException ex)
                     {
+                        Console.WriteLine(ex.ToString());
                         test(false);
                     }
                     fact.destroyServer(server);
@@ -870,8 +883,9 @@ public class AllTests
                         info = (IceSSL.ConnectionInfo)server.ice_getConnection().getInfo();
                         test(info.certs.Length == 1); // Like the SChannel transport, .NET never sends the root.
                     }
-                    catch(Ice.LocalException)
+                    catch(Ice.LocalException ex)
                     {
+                        Console.WriteLine(ex.ToString());
                         test(false);
                     }
                     fact.destroyServer(server);
@@ -897,8 +911,9 @@ public class AllTests
                             test(info.certs.Length == 2);
                             test(info.verified);
                         }
-                        catch(Ice.LocalException)
+                        catch(Ice.LocalException ex)
                         {
+                            Console.WriteLine(ex.ToString());
                             test(false);
                         }
                         fact.destroyServer(server);
@@ -928,8 +943,9 @@ public class AllTests
                         {
                             // Chain length too long
                         }
-                        catch(Ice.LocalException)
+                        catch(Ice.LocalException ex)
                         {
+                            Console.WriteLine(ex.ToString());
                             test(false);
                         }
                         fact.destroyServer(server);
@@ -957,8 +973,9 @@ public class AllTests
                             test(info.certs.Length == 3);
                             test(info.verified);
                         }
-                        catch(Ice.LocalException)
+                        catch(Ice.LocalException ex)
                         {
+                            Console.WriteLine(ex.ToString());
                             test(false);
                         }
                         fact.destroyServer(server);
@@ -1002,8 +1019,9 @@ public class AllTests
                             test(info.certs.Length == 4);
                             test(info.verified);
                         }
-                        catch(Ice.LocalException)
+                        catch(Ice.LocalException ex)
                         {
+                            Console.WriteLine(ex.ToString());
                             test(false);
                         }
                         fact.destroyServer(server);
@@ -1039,8 +1057,9 @@ public class AllTests
                         {
                             // Expected
                         }
-                        catch(Ice.LocalException)
+                        catch(Ice.LocalException ex)
                         {
+                            Console.WriteLine(ex.ToString());
                             test(false);
                         }
                         fact.destroyServer(server);
@@ -1055,8 +1074,9 @@ public class AllTests
                         {
                             server.ice_getConnection();
                         }
-                        catch(Ice.LocalException)
+                        catch(Ice.LocalException ex)
                         {
+                            Console.WriteLine(ex.ToString());
                             test(false);
                         }
                         fact.destroyServer(server);
@@ -1097,8 +1117,9 @@ public class AllTests
                     IceSSL.ConnectionInfo info = (IceSSL.ConnectionInfo)server.ice_getConnection().getInfo();
                     server.checkCipher(info.cipher);
                 }
-                catch(Ice.LocalException)
+                catch(Ice.LocalException ex)
                 {
+                    Console.WriteLine(ex.ToString());
                     test(false);
                 }
                 test(verifier.invoked());
@@ -1120,8 +1141,9 @@ public class AllTests
                 {
                     // Expected.
                 }
-                catch(Ice.LocalException)
+                catch(Ice.LocalException ex)
                 {
+                    Console.WriteLine(ex.ToString());
                     test(false);
                 }
                 test(verifier.invoked());
@@ -1169,8 +1191,9 @@ public class AllTests
                 {
                     // Expected.
                 }
-                catch(Ice.LocalException)
+                catch(Ice.LocalException ex)
                 {
+                    Console.WriteLine(ex.ToString());
                     test(false);
                 }
                 fact.destroyServer(server);
@@ -1190,8 +1213,9 @@ public class AllTests
                 {
                     server.ice_ping();
                 }
-                catch(Ice.LocalException)
+                catch(Ice.LocalException ex)
                 {
+                    Console.WriteLine(ex.ToString());
                     test(false);
                 }
                 fact.destroyServer(server);
@@ -1231,8 +1255,9 @@ public class AllTests
                     // Expected with .NET < 4.5
                     test(!is45OrGreater);
                 }
-                catch(Ice.LocalException)
+                catch(Ice.LocalException ex)
                 {
+                    Console.WriteLine(ex.ToString());
                     test(false);
                 }
             }
@@ -1258,8 +1283,9 @@ public class AllTests
                 {
                     // Expected.
                 }
-                catch(Ice.LocalException)
+                catch(Ice.LocalException ex)
                 {
+                    Console.WriteLine(ex.ToString());
                     test(false);
                 }
                 fact.destroyServer(server);
@@ -1279,8 +1305,9 @@ public class AllTests
                 {
                     server.ice_ping();
                 }
-                catch(Ice.LocalException)
+                catch(Ice.LocalException ex)
                 {
+                    Console.WriteLine(ex.ToString());
                     test(false);
                 }
                 fact.destroyServer(server);
@@ -1367,8 +1394,9 @@ public class AllTests
                     {
                         server.ice_ping();
                     }
-                    catch(Ice.LocalException)
+                    catch(Ice.LocalException ex)
                     {
+                        Console.WriteLine(ex.ToString());
                         test(false);
                     }
                     fact.destroyServer(server);
@@ -1393,8 +1421,9 @@ public class AllTests
                 {
                     server.ice_ping();
                 }
-                catch(Ice.LocalException)
+                catch(Ice.LocalException ex)
                 {
+                    Console.WriteLine(ex.ToString());
                     test(false);
                 }
                 fact.destroyServer(server);
@@ -1418,8 +1447,9 @@ public class AllTests
                 {
                     server.ice_ping();
                 }
-                catch(Ice.LocalException)
+                catch(Ice.LocalException ex)
                 {
+                    Console.WriteLine(ex.ToString());
                     test(false);
                 }
                 fact.destroyServer(server);
@@ -1445,8 +1475,9 @@ public class AllTests
                 {
                     // Expected.
                 }
-                catch(Ice.LocalException)
+                catch(Ice.LocalException ex)
                 {
+                    Console.WriteLine(ex.ToString());
                     test(false);
                 }
             }
@@ -1473,8 +1504,9 @@ public class AllTests
                 {
                     // Expected.
                 }
-                catch(Ice.LocalException)
+                catch(Ice.LocalException ex)
                 {
+                    Console.WriteLine(ex.ToString());
                     test(false);
                 }
                 comm.destroy();
@@ -1498,8 +1530,9 @@ public class AllTests
                 {
                     pm.initializePlugins();
                 }
-                catch(Ice.LocalException)
+                catch(Ice.LocalException ex)
                 {
+                    Console.WriteLine(ex.ToString());
                     test(false);
                 }
                 comm.destroy();
@@ -1536,8 +1569,9 @@ public class AllTests
                 {
                     server.ice_ping();
                 }
-                catch(Ice.LocalException)
+                catch(Ice.LocalException ex)
                 {
+                    Console.WriteLine(ex.ToString());
                     test(false);
                 }
                 fact.destroyServer(server);
@@ -1576,8 +1610,9 @@ public class AllTests
                 {
                     server.ice_ping();
                 }
-                catch(Ice.LocalException)
+                catch(Ice.LocalException ex)
                 {
+                    Console.WriteLine(ex.ToString());
                     test(false);
                 }
                 fact.destroyServer(server);
@@ -1596,8 +1631,9 @@ public class AllTests
                 {
                     server.ice_ping();
                 }
-                catch(Ice.LocalException)
+                catch(Ice.LocalException ex)
                 {
+                    Console.WriteLine(ex.ToString());
                     test(false);
                 }
                 fact.destroyServer(server);
@@ -1635,8 +1671,9 @@ public class AllTests
                 {
                     server.ice_ping();
                 }
-                catch(Ice.LocalException)
+                catch(Ice.LocalException ex)
                 {
+                    Console.WriteLine(ex.ToString());
                     test(false);
                 }
                 fact.destroyServer(server);
@@ -1673,8 +1710,9 @@ public class AllTests
                 {
                     server.ice_ping();
                 }
-                catch(Ice.LocalException)
+                catch(Ice.LocalException ex)
                 {
+                    Console.WriteLine(ex.ToString());
                     test(false);
                 }
                 fact.destroyServer(server);
@@ -1768,8 +1806,9 @@ public class AllTests
                 {
                     server.ice_ping();
                 }
-                catch(Ice.LocalException)
+                catch(Ice.LocalException ex)
                 {
+                    Console.WriteLine(ex.ToString());
                     test(false);
                 }
                 fact.destroyServer(server);
@@ -1787,8 +1826,9 @@ public class AllTests
                 {
                     server.ice_ping();
                 }
-                catch(Ice.LocalException)
+                catch(Ice.LocalException ex)
                 {
+                    Console.WriteLine(ex.ToString());
                     test(false);
                 }
                 fact.destroyServer(server);
@@ -1825,8 +1865,9 @@ public class AllTests
                 {
                     server.ice_ping();
                 }
-                catch(Ice.LocalException)
+                catch(Ice.LocalException ex)
                 {
+                    Console.WriteLine(ex.ToString());
                     test(false);
                 }
                 fact.destroyServer(server);
@@ -1844,8 +1885,9 @@ public class AllTests
                 {
                     server.ice_ping();
                 }
-                catch(Ice.LocalException)
+                catch(Ice.LocalException ex)
                 {
+                    Console.WriteLine(ex.ToString());
                     test(false);
                 }
                 fact.destroyServer(server);
@@ -1915,8 +1957,9 @@ public class AllTests
                 {
                     server.ice_ping();
                 }
-                catch(Ice.LocalException)
+                catch(Ice.LocalException ex)
                 {
+                    Console.WriteLine(ex.ToString());
                     test(false);
                 }
                 fact.destroyServer(server);
@@ -1955,8 +1998,9 @@ public class AllTests
                 {
                     server.ice_ping();
                 }
-                catch(Ice.LocalException)
+                catch(Ice.LocalException ex)
                 {
+                    Console.WriteLine(ex.ToString());
                     test(false);
                 }
                 fact.destroyServer(server);
@@ -1993,8 +2037,9 @@ public class AllTests
                 {
                     server.ice_ping();
                 }
-                catch(Ice.LocalException)
+                catch(Ice.LocalException ex)
                 {
+                    Console.WriteLine(ex.ToString());
                     test(false);
                 }
                 fact.destroyServer(server);
@@ -2020,8 +2065,9 @@ public class AllTests
                 {
                     server.ice_ping();
                 }
-                catch(Ice.LocalException)
+                catch(Ice.LocalException ex)
                 {
+                    Console.WriteLine(ex.ToString());
                     test(false);
                 }
                 fact.destroyServer(server);
@@ -2060,8 +2106,9 @@ public class AllTests
                 {
                     server.ice_ping();
                 }
-                catch(Ice.LocalException)
+                catch(Ice.LocalException ex)
                 {
+                    Console.WriteLine(ex.ToString());
                     test(false);
                 }
                 fact.destroyServer(server);
@@ -2123,8 +2170,9 @@ public class AllTests
                 {
                     server.ice_ping();
                 }
-                catch(Ice.LocalException)
+                catch(Ice.LocalException ex)
                 {
+                    Console.WriteLine(ex.ToString());
                     test(false);
                 }
                 fact.destroyServer(server);
@@ -2181,8 +2229,9 @@ public class AllTests
                 {
                     server.ice_ping();
                 }
-                catch(Ice.LocalException)
+                catch(Ice.LocalException ex)
                 {
+                    Console.WriteLine(ex.ToString());
                     test(false);
                 }
                 fact.destroyServer(server);
@@ -2260,8 +2309,9 @@ public class AllTests
                         {
                             server.ice_ping();
                         }
-                        catch(Ice.LocalException)
+                        catch(Ice.LocalException ex)
                         {
+                            Console.WriteLine(ex.ToString());
                             test(false);
                         }
                         fact.destroyServer(server);
@@ -2284,8 +2334,9 @@ public class AllTests
                         {
                             // Expected
                         }
-                        catch(Ice.LocalException)
+                        catch(Ice.LocalException ex)
                         {
+                            Console.WriteLine(ex.ToString());
                             test(false);
                         }
                     }
@@ -2316,8 +2367,9 @@ public class AllTests
                     {
                         // Expected
                     }
-                    catch(Ice.LocalException)
+                    catch(Ice.LocalException ex)
                     {
+                        Console.WriteLine(ex.ToString());
                         test(false);
                     }
                 }
@@ -2331,6 +2383,11 @@ public class AllTests
                 initData.properties.setProperty("IceSSL.DefaultDir", "");
                 initData.properties.setProperty("IceSSL.VerifyDepthMax", "4");
                 initData.properties.setProperty("Ice.Override.Timeout", "5000"); // 5s timeout
+                //
+                // BUGFIX: SCHannel TLS 1.2 bug that affects Windows version prior to Windows 10
+                // can cause SSL handshake errors whe connecting to the remote zeroc server.
+                //
+                initData.properties.setProperty("IceSSL.Protocols", "TLS1_0,TLS1_1");
                 Ice.Communicator comm = Ice.Util.initialize(initData);
                 Ice.ObjectPrx p = comm.stringToProxy("dummy:wss -h demo.zeroc.com -p 5064");
                 try
@@ -2342,8 +2399,9 @@ public class AllTests
                 {
                     // Expected, by default we don't check for system CAs.
                 }
-                catch(Ice.LocalException)
+                catch(Ice.LocalException ex)
                 {
+                    Console.WriteLine(ex.ToString());
                     test(false);
                 }
 
@@ -2352,6 +2410,11 @@ public class AllTests
                 initData.properties.setProperty("IceSSL.VerifyDepthMax", "4");
                 initData.properties.setProperty("Ice.Override.Timeout", "5000"); // 5s timeout
                 initData.properties.setProperty("IceSSL.UsePlatformCAs", "1");
+                //
+                // BUGFIX: SCHannel TLS 1.2 bug that affects Windows version prior to Windows 10
+                // can cause SSL handshake errors whe connecting to the remote zeroc server.
+                //
+                initData.properties.setProperty("IceSSL.Protocols", "TLS1_0,TLS1_1");
                 comm = Ice.Util.initialize(initData);
                 p = comm.stringToProxy("dummy:wss -h demo.zeroc.com -p 5064");
                 IceSSL.ConnectionInfo info;
@@ -2360,8 +2423,9 @@ public class AllTests
                     info = (IceSSL.ConnectionInfo)p.ice_getConnection().getInfo().underlying;
                     test(info.verified);
                 }
-                catch(Ice.LocalException)
+                catch(Ice.LocalException ex)
                 {
+                    Console.WriteLine(ex.ToString());
                     test(false);
                 }
                 comm.destroy();

@@ -630,7 +630,7 @@ public interface ObjectPrx
     Connection ice_getConnection();
 
     /**
-     * Returns an executor object that use the Ice thread pool.
+     * Returns an executor object that uses the Ice thread pool.
      *
      * @return The Executor object.
      **/
@@ -934,55 +934,6 @@ public interface ObjectPrx
             }
         }
         return r;
-    }
-
-    static <T> T waitForResponseForCompletion(java.util.concurrent.CompletableFuture<T> f)
-    {
-        try
-        {
-            return waitForResponseForCompletionUserEx(f);
-        }
-        catch(UserException ex)
-        {
-            throw new UnknownUserException(ex.ice_id(), ex);
-        }
-    }
-
-    static <T> T waitForResponseForCompletionUserEx(java.util.concurrent.CompletableFuture<T> f)
-        throws UserException
-    {
-        if(Thread.interrupted())
-        {
-            throw new OperationInterruptedException();
-        }
-
-        try
-        {
-            return f.get();
-        }
-        catch(InterruptedException ex)
-        {
-            throw new OperationInterruptedException();
-        }
-        catch(java.util.concurrent.ExecutionException ee)
-        {
-            try
-            {
-                throw ee.getCause();
-            }
-            catch(RuntimeException ex) // Includes LocalException
-            {
-                throw ex;
-            }
-            catch(UserException ex)
-            {
-                throw ex;
-            }
-            catch(Throwable ex)
-            {
-                throw new UnknownException(ex);
-            }
-        }
     }
 
     void _write(OutputStream os);

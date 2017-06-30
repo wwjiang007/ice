@@ -510,9 +510,10 @@ def allTests(communicator):
 
     sys.stdout.write("preserved exceptions... ")
     sys.stdout.flush()
-    adapter = communicator.createObjectAdapterWithEndpoints("Relay", "default")
+    adapter = communicator.createObjectAdapter("")
     relay = Test.RelayPrx.uncheckedCast(adapter.addWithUUID(RelayI()))
     adapter.activate()
+    t.ice_getConnection().setAdapter(adapter)
 
     try:
         t.relayKnownPreservedAsBase(relay)

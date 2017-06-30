@@ -222,8 +222,6 @@ protected:
 
 private:
 
-    void checkAsyncTwowayOnly(const Ice::ObjectPrx&) const;
-
     OperationPtr _op;
 };
 
@@ -1134,7 +1132,7 @@ asyncResultCallLater(AsyncResultObject* self, PyObject* args)
 
     try
     {
-        (*self->result)->scheduleCallback(new CallbackI(callback));
+        (*self->result)->_scheduleCallback(new CallbackI(callback));
     }
     catch(const Ice::CommunicatorDestroyedException& ex)
     {
@@ -2456,7 +2454,6 @@ IcePy::AsyncTypedInvocation::invoke(PyObject* args, PyObject* /* kwds */)
                 return 0;
             }
 
-            AllowThreads allowThreads; // Release Python's global interpreter lock during remote invocations.
             if(cb)
             {
                 result = _prx->begin_ice_invoke(_op->name, _op->sendMode, params, ctx, cb);
@@ -2468,7 +2465,6 @@ IcePy::AsyncTypedInvocation::invoke(PyObject* args, PyObject* /* kwds */)
         }
         else
         {
-            AllowThreads allowThreads; // Release Python's global interpreter lock during remote invocations.
             if(cb)
             {
                 result = _prx->begin_ice_invoke(_op->name, _op->sendMode, params, cb);
@@ -2719,13 +2715,12 @@ IcePy::NewAsyncInvocation::invoke(PyObject* args, PyObject* kwds)
         setPythonException(ex);
         return 0;
     }
-    catch(const IceUtil::IllegalArgumentException& ex)
+    catch(const Ice::TwowayOnlyException& ex)
     {
         //
-        // IllegalArgumentException can propagate directly.
-        // (Raised by checkAsyncTwowayOnly)
+        // TwowayOnlyException can propagate directly.
         //
-        PyErr_Format(PyExc_RuntimeError, "%s", STRCAST(ex.reason().c_str()));
+        setPythonException(ex);
         return 0;
     }
     catch(const Ice::Exception&)
@@ -2743,27 +2738,18 @@ IcePy::NewAsyncInvocation::invoke(PyObject* args, PyObject* kwds)
 
     assert(result);
 
-    PyObjectHandle communicatorObj = getCommunicatorWrapper(_communicator);
-    PyObjectHandle asyncResultObj;
-
-    //
-    // Pass the AsyncResult object to the future. Note that this creates a circular reference.
-    // Don't do this for batch invocations because there is no opportunity to break the circular
-    // reference.
-    //
-    if(!_prx->ice_isBatchOneway() && !_prx->ice_isBatchDatagram())
-    {
-        asyncResultObj = createAsyncResult(result, _pyProxy, 0, communicatorObj.get());
-        if(!asyncResultObj.get())
-        {
-            return 0;
-        }
-    }
-
     //
     // NOTE: Any time we call into interpreted Python code there's a chance that another thread will be
     // allowed to run!
     //
+
+    PyObjectHandle communicatorObj = getCommunicatorWrapper(_communicator);
+
+    PyObjectHandle asyncResultObj = createAsyncResult(result, _pyProxy, 0, communicatorObj.get());
+    if(!asyncResultObj.get())
+    {
+        return 0;
+    }
 
     PyObjectHandle future = createFuture(_operation, asyncResultObj.get()); // Calls into Python code.
     if(!future.get())
@@ -2774,54 +2760,64 @@ IcePy::NewAsyncInvocation::invoke(PyObject* args, PyObject* kwds)
     //
     // Check if any callbacks have been invoked already.
     //
-
-    if(_sent)
+    if(!_prx->ice_isBatchOneway() && !_prx->ice_isBatchDatagram())
     {
-        PyObjectHandle tmp = callMethod(future.get(), "set_sent", _sentSynchronously ? getTrue() : getFalse());
+        if(_sent)
+        {
+            PyObjectHandle tmp = callMethod(future.get(), "set_sent", _sentSynchronously ? getTrue() : getFalse());
+            if(PyErr_Occurred())
+            {
+                return 0;
+            }
+
+            if(!_twoway)
+            {
+                //
+                // For a oneway/datagram invocation, we consider it complete when sent.
+                //
+                tmp = callMethod(future.get(), "set_result", Py_None);
+                if(PyErr_Occurred())
+                {
+                    return 0;
+                }
+            }
+        }
+
+        if(_done)
+        {
+            if(_exception)
+            {
+                PyObjectHandle tmp = callMethod(future.get(), "set_exception", _exception);
+                if(PyErr_Occurred())
+                {
+                    return 0;
+                }
+            }
+            else
+            {
+                //
+                // Delegate to the subclass.
+                //
+                pair<const Ice::Byte*, const Ice::Byte*> p(&_results[0], &_results[0] + _results.size());
+                handleResponse(future.get(), _ok, p);
+                if(PyErr_Occurred())
+                {
+                    return 0;
+                }
+            }
+        }
+        _future = future.release();
+        return incRef(_future);
+    }
+    else
+    {
+        PyObjectHandle tmp = callMethod(future.get(), "set_result", Py_None);
         if(PyErr_Occurred())
         {
             return 0;
         }
-
-        if(!_twoway)
-        {
-            //
-            // For a oneway/datagram invocation, we consider it complete when sent.
-            //
-            tmp = callMethod(future.get(), "set_result", Py_None);
-            if(PyErr_Occurred())
-            {
-                return 0;
-            }
-        }
+        return future.release();
     }
-
-    if(_done)
-    {
-        if(_exception)
-        {
-            PyObjectHandle tmp = callMethod(future.get(), "set_exception", _exception);
-            if(PyErr_Occurred())
-            {
-                return 0;
-            }
-        }
-        else
-        {
-            //
-            // Delegate to the subclass.
-            //
-            pair<const Ice::Byte*, const Ice::Byte*> p(&_results[0], &_results[0] + _results.size());
-            handleResponse(future.get(), _ok, p);
-            if(PyErr_Occurred())
-            {
-                return 0;
-            }
-        }
-    }
-
-    _future = future.release();
-    return incRef(_future);
 }
 
 void
@@ -2979,12 +2975,17 @@ IcePy::NewAsyncTypedInvocation::handleInvoke(PyObject* args, PyObject* /* kwds *
         return 0;
     }
 
-    checkAsyncTwowayOnly(_prx);
+    checkTwowayOnly(_op, _prx);
 
     NewAsyncInvocationPtr self = this;
-    Ice::Callback_Object_ice_invokePtr cb =
-        Ice::newCallback_Object_ice_invoke(self, &NewAsyncInvocation::response, &NewAsyncInvocation::exception,
-                                           &NewAsyncInvocation::sent);
+    Ice::Callback_Object_ice_invokePtr cb;
+    if(!_prx->ice_isBatchOneway() && !_prx->ice_isBatchDatagram())
+    {
+        cb = Ice::newCallback_Object_ice_invoke(self,
+                                                &NewAsyncInvocation::response,
+                                                &NewAsyncInvocation::exception,
+                                                &NewAsyncInvocation::sent);
+    }
 
     //
     // Invoke the operation asynchronously.
@@ -3004,13 +3005,25 @@ IcePy::NewAsyncTypedInvocation::handleInvoke(PyObject* args, PyObject* /* kwds *
             return 0;
         }
 
-        AllowThreads allowThreads; // Release Python's global interpreter lock during remote invocations.
-        return _prx->begin_ice_invoke(_op->name, _op->sendMode, params, ctx, cb);
+        if(cb)
+        {
+            return _prx->begin_ice_invoke(_op->name, _op->sendMode, params, ctx, cb);
+        }
+        else
+        {
+            return _prx->begin_ice_invoke(_op->name, _op->sendMode, params, ctx);
+        }
     }
     else
     {
-        AllowThreads allowThreads; // Release Python's global interpreter lock during remote invocations.
-        return _prx->begin_ice_invoke(_op->name, _op->sendMode, params, cb);
+        if(cb)
+        {
+            return _prx->begin_ice_invoke(_op->name, _op->sendMode, params, cb);
+        }
+        else
+        {
+            return _prx->begin_ice_invoke(_op->name, _op->sendMode, params);
+        }
     }
 }
 
@@ -3079,16 +3092,6 @@ IcePy::NewAsyncTypedInvocation::handleResponse(PyObject* future, bool ok,
     catch(const AbortMarshaling&)
     {
         assert(PyErr_Occurred());
-    }
-}
-
-void
-IcePy::NewAsyncTypedInvocation::checkAsyncTwowayOnly(const Ice::ObjectPrx& proxy) const
-{
-    if((_op->returnType != 0 || !_op->outParams.empty() || !_op->exceptions.empty()) && !proxy->ice_isTwoway())
-    {
-        throw IceUtil::IllegalArgumentException(__FILE__, __LINE__,
-                                                "`" + _op->name + "' can only be called with a twoway proxy");
     }
 }
 
@@ -3372,7 +3375,6 @@ IcePy::AsyncBlobjectInvocation::invoke(PyObject* args, PyObject* kwds)
 
         if(pyctx == Py_None)
         {
-            AllowThreads allowThreads; // Release Python's global interpreter lock during remote invocations.
             if(cb)
             {
                 result = _prx->begin_ice_invoke(operation, sendMode, in, cb);
@@ -3390,7 +3392,6 @@ IcePy::AsyncBlobjectInvocation::invoke(PyObject* args, PyObject* kwds)
                 return 0;
             }
 
-            AllowThreads allowThreads; // Release Python's global interpreter lock during remote invocations.
             if(cb)
             {
                 result = _prx->begin_ice_invoke(operation, sendMode, in, context, cb);
@@ -3661,18 +3662,25 @@ IcePy::NewAsyncBlobjectInvocation::handleInvoke(PyObject* args, PyObject* /* kwd
 #endif
 
     NewAsyncInvocationPtr self = this;
-    Ice::Callback_Object_ice_invokePtr cb =
-        Ice::newCallback_Object_ice_invoke(self, &NewAsyncInvocation::response, &NewAsyncInvocation::exception,
-                                           &NewAsyncInvocation::sent);
+    Ice::Callback_Object_ice_invokePtr cb;
+    if(!_prx->ice_isBatchOneway() && !_prx->ice_isBatchDatagram())
+    {
+        cb = Ice::newCallback_Object_ice_invoke(self,
+                                                &NewAsyncInvocation::response,
+                                                &NewAsyncInvocation::exception,
+                                                &NewAsyncInvocation::sent);
+    }
 
     if(ctx == 0 || ctx == Py_None)
     {
-        //
-        // Don't release the GIL here. We want other threads to block until we've had a chance
-        // to create the future.
-        //
-        //AllowThreads allowThreads; // Release Python's global interpreter lock during remote invocations.
-        return _prx->begin_ice_invoke(operation, sendMode, in, cb);
+        if(cb)
+        {
+            return _prx->begin_ice_invoke(operation, sendMode, in, cb);
+        }
+        else
+        {
+            return _prx->begin_ice_invoke(operation, sendMode, in);
+        }
     }
     else
     {
@@ -3682,12 +3690,14 @@ IcePy::NewAsyncBlobjectInvocation::handleInvoke(PyObject* args, PyObject* /* kwd
             return 0;
         }
 
-        //
-        // Don't release the GIL here. We want other threads to block until we've had a chance
-        // to create the future.
-        //
-        //AllowThreads allowThreads; // Release Python's global interpreter lock during remote invocations.
-        return _prx->begin_ice_invoke(operation, sendMode, in, context, cb);
+        if(cb)
+        {
+            return _prx->begin_ice_invoke(operation, sendMode, in, context, cb);
+        }
+        else
+        {
+            return _prx->begin_ice_invoke(operation, sendMode, in, context);
+        }
     }
 }
 
@@ -3934,7 +3944,6 @@ IcePy::TypedUpcall::response(PyObject* result)
         if(PyObject_IsInstance(result, reinterpret_cast<PyObject*>(&MarshaledResultType)))
         {
             MarshaledResultObject* mro = reinterpret_cast<MarshaledResultObject*>(result);
-            AllowThreads allowThreads; // Release Python's global interpreter lock during blocking calls.
             _callback->ice_response(true, mro->out->finished());
         }
         else
@@ -3948,7 +3957,6 @@ IcePy::TypedUpcall::response(PyObject* result)
 
                 os.endEncapsulation();
 
-                AllowThreads allowThreads; // Release Python's global interpreter lock during blocking calls.
                 _callback->ice_response(true, os.finished());
             }
             catch(const AbortMarshaling&)
@@ -3959,7 +3967,6 @@ IcePy::TypedUpcall::response(PyObject* result)
                 }
                 catch(const Ice::Exception& ex)
                 {
-                    AllowThreads allowThreads; // Release Python's global interpreter lock during blocking calls.
                     _callback->ice_exception(ex);
                 }
             }
@@ -3967,7 +3974,6 @@ IcePy::TypedUpcall::response(PyObject* result)
     }
     catch(const Ice::Exception& ex)
     {
-        AllowThreads allowThreads; // Release Python's global interpreter lock during blocking calls.
         _callback->ice_exception(ex);
     }
 }
@@ -4007,7 +4013,6 @@ IcePy::TypedUpcall::exception(PyException& ex)
 
                 os.endEncapsulation();
 
-                AllowThreads allowThreads; // Release Python's global interpreter lock during blocking calls.
                 _callback->ice_response(false, os.finished());
             }
             else
@@ -4029,7 +4034,6 @@ IcePy::TypedUpcall::exception(PyException& ex)
 void
 IcePy::TypedUpcall::exception(const Ice::Exception& ex)
 {
-    AllowThreads allowThreads; // Release Python's global interpreter lock during blocking calls.
     _callback->ice_exception(ex);
 }
 
@@ -4154,7 +4158,6 @@ IcePy::BlobjectUpcall::response(PyObject* result)
         const pair<const ::Ice::Byte*, const ::Ice::Byte*> r(mem, mem + sz);
 #endif
 
-        AllowThreads allowThreads; // Release Python's global interpreter lock during blocking calls.
         _callback->ice_response(isTrue, r);
     }
     catch(const AbortMarshaling&)
@@ -4198,7 +4201,6 @@ IcePy::BlobjectUpcall::exception(PyException& ex)
 void
 IcePy::BlobjectUpcall::exception(const Ice::Exception& ex)
 {
-    AllowThreads allowThreads; // Release Python's global interpreter lock during blocking calls.
     _callback->ice_exception(ex);
 }
 
@@ -4703,7 +4705,6 @@ IcePy::TypedServantWrapper::ice_invoke_async(const Ice::AMD_Object_ice_invokePtr
     }
     catch(const Ice::Exception& ex)
     {
-        AllowThreads allowThreads; // Release Python's global interpreter lock during blocking calls.
         cb->ice_exception(ex);
     }
 }
@@ -4730,7 +4731,6 @@ IcePy::BlobjectServantWrapper::ice_invoke_async(const Ice::AMD_Object_ice_invoke
     }
     catch(const Ice::Exception& ex)
     {
-        AllowThreads allowThreads; // Release Python's global interpreter lock during blocking calls.
         cb->ice_exception(ex);
     }
 }

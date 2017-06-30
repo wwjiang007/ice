@@ -126,7 +126,6 @@ private:
         return item;
     }
 
-
     IceUtil::Monitor<IceUtil::Mutex> _monitor;
 #ifdef ICE_CPP11_MAPPING
     list<std::function<void()>> _queue;
@@ -446,28 +445,9 @@ public:
             }
             cout << "ok" << endl;
 
-//             cout << "testing SessionHelper session after destroy... " << flush;
-//             try
-//             {
-//                 Glacier2::SessionPrx session = _session->session();
-//                 test(false);
-//             }
-//             catch(const Glacier2::SessionNotExistException&)
-//             {
-//                 cout << "ok" << endl;
-//             }
-//             catch(const std::exception& ex)
-//             {
-//                 cout << ex.what() << endl;
-//             }
-//             catch(const std::string& msg)
-//             {
-//                 cout << msg << endl;
-//             }
-//             catch(...)
-//             {
-//                 test(false);
-//             }
+            cout << "testing SessionHelper session after destroy... " << flush;
+            test(_session->session() == ICE_NULLPTR);
+            cout << "ok" << endl;
 
             cout << "testing SessionHelper communicator after destroy... " << flush;
             try
@@ -481,7 +461,6 @@ public:
             }
             cout << "ok" << endl;
 
-
             cout << "uninstalling router with communicator... " << flush;
             communicator()->setDefaultRouter(0);
             cout << "ok" << endl;
@@ -493,7 +472,6 @@ public:
                                                             getTestEndpoint(communicator(), 11));
                 cout << "ok" << endl;
             }
-
 
             Ice::ProcessPrxPtr process;
             {
@@ -524,7 +502,6 @@ public:
         // Wait a bit to ensure glaci2router has been shutdown.
         //
         IceUtil::ThreadControl::sleep(IceUtil::Time::milliSeconds(100));
-
 
         {
             IceUtil::Monitor<IceUtil::Mutex>::Lock lock(_monitor);
@@ -587,7 +564,6 @@ private:
 };
 
 } // Anonymous namespace end
-
 
 int
 main(int argc, char* argv[])

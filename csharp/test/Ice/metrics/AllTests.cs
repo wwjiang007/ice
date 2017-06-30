@@ -449,6 +449,7 @@ public class AllTests : TestCommon.AllTests
         metrics.ice_connectionId("Con1").ice_ping();
 
         waitForCurrent(clientMetrics, "View", "Invocation", 0);
+        waitForCurrent(serverMetrics, "View", "Dispatch", 0);
 
         view = clientMetrics.getMetricsView("View", out timestamp);
         test(view["Thread"].Length == 5);
@@ -481,7 +482,7 @@ public class AllTests : TestCommon.AllTests
             test(view["Connection"].Length == 2);
         }
         test(view["Dispatch"].Length == 1);
-        test(view["Dispatch"][0].current <= 1 && view["Dispatch"][0].total == 5);
+        test(view["Dispatch"][0].current == 0 && view["Dispatch"][0].total == 5);
         test(view["Dispatch"][0].id.IndexOf("[ice_ping]") > 0);
 
         if(!collocated)
@@ -1132,13 +1133,13 @@ public class AllTests : TestCommon.AllTests
         MetricsPrx metricsBatchOneway = (MetricsPrx)metrics.ice_batchOneway();
         metricsBatchOneway.op();
         metricsBatchOneway.end_op(metricsBatchOneway.begin_op());
-        //metricsBatchOneway.begin_op().whenCompleted(cb.response, cb.exception).waitForSent();
+        metricsBatchOneway.begin_op().whenCompleted(cb.response, cb.exception);
 
         map = toMap(clientMetrics.getMetricsView("View", out timestamp)["Invocation"]);
         test(map.Count == 1);
 
         im1 = (IceMX.InvocationMetrics)map["op"];
-        test(im1.current == 0 && im1.total == 2 && im1.failures == 0 && im1.retry == 0);
+        test(im1.current == 0 && im1.total == 3 && im1.failures == 0 && im1.retry == 0);
         test(im1.remotes.Length == 0);
 
         testAttribute(clientMetrics, clientProps, update, "Invocation", "mode", "batch-oneway",

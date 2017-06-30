@@ -11,7 +11,7 @@
 Ice module
 """
 
-import sys, string, imp, os, threading, warnings, datetime, logging, time, inspect
+import sys, string, imp, os, threading, warnings, datetime, logging, time, inspect, traceback
 
 #
 # RTTI problems can occur in C++ code unless we modify Python's dlopen flags.
@@ -202,7 +202,10 @@ class Future(FutureBase):
             try:
                 callback(self)
             except:
-                logging.getLogger("Ice.Future").exception('callback raised exception')
+                self._warn('done callback raised exception')
+
+    def _warn(self, msg):
+        logging.getLogger("Ice.Future").exception(msg)
 
     StateRunning = 'running'
     StateCancelled = 'cancelled'
@@ -211,6 +214,7 @@ class Future(FutureBase):
 class InvocationFuture(Future):
     def __init__(self, operation, asyncResult):
         Future.__init__(self)
+        assert(asyncResult)
         self._operation = operation
         self._asyncResult = asyncResult # May be None for a batch invocation.
         self._sent = False
@@ -218,19 +222,21 @@ class InvocationFuture(Future):
         self._sentCallbacks = []
 
     def cancel(self):
-        if self._asyncResult:
-            self._asyncResult.cancel()
+        self._asyncResult.cancel()
         return Future.cancel(self)
 
     def add_done_callback_async(self, fn):
+        def callback():
+            try:
+                fn(self)
+            except:
+                self._warn('done callback raised exception')
+
         with self._condition:
             if self._state == Future.StateRunning:
                 self._doneCallbacks.append(fn)
                 return
-        if self._asyncResult:
-            self._asyncResult.callLater(lambda: fn(self))
-        else:
-            fn(self)
+        self._asyncResult.callLater(callback)
 
     def is_sent(self):
         with self._condition:
@@ -245,10 +251,20 @@ class InvocationFuture(Future):
             if not self._sent:
                 self._sentCallbacks.append(fn)
                 return
-        if self._sentSynchronously or not self._asyncResult:
-            fn(self, self._sentSynchronously)
-        else:
-            self._asyncResult.callLater(lambda: fn(self, self._sentSynchronously))
+        fn(self, self._sentSynchronously)
+
+    def add_sent_callback_async(self, fn):
+        def callback():
+            try:
+                fn(self, self._sentSynchronously)
+            except:
+                self._warn('sent callback raised exception')
+
+        with self._condition:
+            if not self._sent:
+                self._sentCallbacks.append(fn)
+                return
+        self._asyncResult.callLater(callback)
 
     def sent(self, timeout=None):
         with self._condition:
@@ -277,19 +293,27 @@ class InvocationFuture(Future):
             try:
                 callback(self, sentSynchronously)
             except Exception:
-                logging.getLogger("Ice.Future").exception('callback raised exception')
+                self._warn('sent callback raised exception')
 
     def operation(self):
         return self._operation
 
     def proxy(self):
-        return None if not self._asyncResult else self._asyncResult.getProxy()
+        return self._asyncResult.getProxy()
 
     def connection(self):
-        return None if not self._asyncResult else self._asyncResult.getConnection()
+        return self._asyncResult.getConnection()
 
     def communicator(self):
-        return None if not self._asyncResult else self._asyncResult.getCommunicator()
+        return self._asyncResult.getCommunicator()
+
+    def _warn(self, msg):
+        communicator = self.communicator()
+        if communicator:
+            if communicator.getProperties().getPropertyAsIntWithDefault("Ice.Warn.AMICallback", 1) > 0:
+                communicator.getLogger().warning("Ice.Future: " + msg + ":\n" + traceback.format_exc())
+        else:
+            logging.getLogger("Ice.Future").exception(msg)
 
 #
 # This value is used as the default value for struct types in the constructors
@@ -1297,7 +1321,6 @@ class ImplicitContextI(ImplicitContext):
     def remove(self, key):
         return self._impl.remove(key)
 
-
 #
 # Its not possible to block in a python signal handler since this
 # blocks the main thread from doing further work. As such we queue the
@@ -1437,7 +1460,7 @@ class _ApplicationLoggerI(Logger):
 #
 # Application class.
 #
-import signal, traceback
+import signal
 class Application(object):
     '''Convenience class that initializes a communicator and reacts
 gracefully to signals. An application must define a subclass

@@ -12,7 +12,7 @@ Ice for Python is expected to build and run properly on Windows and was
 extensively tested using the operating systems and compiler versions listed for
 our [supported platforms][2].
 
-The build requires the [Ice Builder for Visual Studio][8]. You must install
+The build requires the [Ice Builder for Visual Studio][3]. You must install
 version 4.3.6 or greater to build Ice.
 
 ### Python Versions
@@ -105,5 +105,6 @@ After a successful build, you can run the tests as follows:
 If everything worked out, you should see lots of `ok` messages. In case of a
 failure, the tests abort with `failed`.
 
-[1]: https://zeroc.com/download.html
-[2]: https://doc.zeroc.com/display/Ice37/Supported+Platforms+for+Ice+3.7.0
+[1]: https://zeroc.com/distributions/ice
+[2]: https://doc.zeroc.com/display/Rel/Supported+Platforms+for+Ice+3.7.0
+[3]: https://github.com/zeroc-ice/ice-builder-visualstudio

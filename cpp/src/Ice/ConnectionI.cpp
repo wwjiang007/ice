@@ -294,7 +294,6 @@ Ice::ConnectionI::Observer::attach(const Ice::Instrumentation::ConnectionObserve
     }
 }
 
-
 void
 Ice::ConnectionI::OutgoingMessage::adopt(OutputStream* str)
 {
@@ -890,15 +889,15 @@ Ice::ConnectionI::_iceI_begin_flushBatchRequests(CompressBatch compress,
 void
 Ice::ConnectionI::end_flushBatchRequests(const AsyncResultPtr& r)
 {
-    AsyncResult::check(r, this, flushBatchRequests_name);
-    r->waitForResponse();
+    AsyncResult::_check(r, this, flushBatchRequests_name);
+    r->_waitForResponse();
 }
 #endif
 
 namespace
 {
 
-const ::std::string __heartbeat_name = "heartbeat";
+const ::std::string heartbeat_name = "heartbeat";
 
 class HeartbeatAsync : public OutgoingAsyncBase
 {
@@ -925,12 +924,12 @@ public:
 
     virtual const string& getOperation() const
     {
-        return __heartbeat_name;
+        return heartbeat_name;
     }
 
     void invoke()
     {
-        _observer.attach(_instance.get(), __heartbeat_name);
+        _observer.attach(_instance.get(), heartbeat_name);
         try
         {
             _os.write(magic[0]);
@@ -1058,8 +1057,8 @@ Ice::ConnectionI::_iceI_begin_heartbeat(const CallbackBasePtr& cb, const LocalOb
 void
 Ice::ConnectionI::end_heartbeat(const AsyncResultPtr& r)
 {
-    AsyncResult::check(r, this, __heartbeat_name);
-    r->waitForResponse();
+    AsyncResult::_check(r, this, heartbeat_name);
+    r->_waitForResponse();
 }
 #endif
 
@@ -1067,6 +1066,10 @@ void
 Ice::ConnectionI::setHeartbeatCallback(ICE_IN(ICE_DELEGATE(HeartbeatCallback)) callback)
 {
     IceUtil::Monitor<IceUtil::Mutex>::Lock sync(*this);
+    if(_state >= StateClosed)
+    {
+        return;
+    }
     _heartbeatCallback = callback;
 }
 
@@ -2082,7 +2085,6 @@ Ice::ConnectionI::finish(bool close)
             }
 #endif
         }
-
 
         for(deque<OutgoingMessage>::iterator o = _sendStreams.begin(); o != _sendStreams.end(); ++o)
         {

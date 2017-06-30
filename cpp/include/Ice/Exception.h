@@ -50,7 +50,6 @@ public:
     static const std::string& ice_staticId();
 };
 
-
 //
 // Base class for all Ice user exceptions
 //
@@ -77,9 +76,11 @@ protected:
     virtual void _readImpl(::Ice::InputStream*) {}
 };
 
-
 //
 // Base class for all Ice system exceptions
+//
+// System exceptions are currently Ice internal, non-documented
+// exceptions.
 //
 class ICE_API SystemException : public IceUtil::Exception
 {

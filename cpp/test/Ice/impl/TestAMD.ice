@@ -144,7 +144,6 @@ dictionary<MyEnum, MyEnumS> MyEnumMyEnumSD;
     LongSS opShortIntLongSS(ShortSS p1, IntSS p2, LongSS p3,
                             out ShortSS p4, out IntSS p5, out LongSS p6);
 
-
     DoubleSS opFloatDoubleSS(FloatSS p1, DoubleSS p2,
                              out FloatSS p3, out DoubleSS p4);
 
@@ -265,17 +264,16 @@ dictionary<MyEnum, MyEnumS> MyEnumMyEnumSD;
 struct MyStruct1
 {
     string tesT; // Same name as the enclosing module
-    MyClass myClass; // Same name as an already defined class
+    MyClass* myClass; // Same name as an already defined class
     string myStruct1; // Same name as the enclosing struct
 }
 
 class MyClass1
 {
     string tesT; // Same name as the enclosing module
-    MyClass myClass; // Same name as an already defined class
+    MyClass* myClass; // Same name as an already defined class
     string myClass1; // Same name as the enclosing class
 }
-
 
 ["amd"] interface MyDerivedClass extends MyClass
 {
@@ -283,7 +281,6 @@ class MyClass1
     MyClass1 opMyClass1(MyClass1 opMyClass1);
     MyStruct1 opMyStruct1(MyStruct1 opMyStruct1);
 }
-
 
 //
 // String literals

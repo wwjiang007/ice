@@ -11,14 +11,8 @@ supported platforms.
 Ice for PHP was extensively tested using the operating systems and compiler
 versions listed for our [supported platforms][2].
 
-The build requires the [Ice Builder for Visual Studio][8]. You must install
-version 4.3.6 or greater to build Ice.
-
-### Preparing to Build
-
-The build system requires the slice2php compiler from Ice for C++. If you have not
-built Ice for C++ in this source distribution, refer to the
-[C++ build instructions](../cpp/BuildInstructionsWindows.md).
+The build requires the [Ice Builder for Visual Studio][3]. You must install
+version 4.3.7 or greater to build Ice.
 
 ## Building the PHP Extension
 
@@ -58,9 +52,11 @@ to `no`:
 
     msbuild msbuild\ice.proj /p:PhpUseNamespaces=no
 
-It is also possible to build the test suite against a binary Ice distribution:
+The PHP extension depends on Ice for C++ components from the `cpp` subdirectory, and those
+are built if required. It is also possible to build the PHP extension using the Ice for C++
+NuGet packages by setting the`ICE_BIN_DIST` msbuild property to `cpp`:
 
-    msbuild msbuild\ice.proj /p:UseBinDist=yes /p:"IceHome=C:\Program Files\ZeroC\Ice-3.7.0"
+    msbuild msbuild\ice.proj /p:ICE_BIN_DIST=cpp
 
 ## Installing the PHP Extension
 
@@ -73,14 +69,14 @@ directive by running the command-line version of PHP with the `-i` option:
 
 Review the output for a line like this:
 
-    extension_dir => C:\Program Files\iis express\PHP\v7.0\ext\ => C:\Program Files\iis express\PHP\v7.0\ext\
+    extension_dir => C:\Program Files\iis express\PHP\v7.1\ext\ => C:\Program Files\iis express\PHP\v7.1\ext\
 
 Once you've copied the extension to the appropriate directory, you will need
 to enable the extension in your PHP configuration. First you must discover the
 location of PHP's configuration file (`php.ini`), which is also displayed by
 the `-i` option. Look for the following line:
 
-    Loaded Configuration File => C:\Program Files\iis express\PHP\v7.0\php.ini
+    Loaded Configuration File => C:\Program Files\iis express\PHP\v7.1\php.ini
 
 Open `php.ini` and append the following directive:
 
@@ -95,14 +91,14 @@ PHP will need to be able to locate the libraries for the Ice run-time libraries
 and its third-party dependencies. On Windows, these DLLs are required:
 
     bzip2.dll
-    ice37b0.dll
+    ice37.dll
     icediscovery37.dll
     icelocatordiscovery37.dll
     icessl37.dll
 
 In general, these libraries must reside in a directory of the user's PATH. For
 IIS configured to run PHP as FastCGI, the simplest solution is to copy the
-libraries next to the php-cgi.exe in C:\Program Files\iis express\PHP\v7.0.
+libraries next to the php-cgi.exe in C:\Program Files\iis express\PHP\v7.1.
 
 You can verify that the Ice extension is installed properly by examining the
 output of the `php -m` command, or by calling the `phpInfo()` function from a
@@ -145,10 +141,17 @@ that the CLI version of the PHP interpreter be available in your PATH.
 
 After a successful build, you can run the tests as follows:
 
-    $ python allTests.py
+    python allTests.py
+
+If you have built the extension using the Ice for C++ NuGet packages, you must
+also set the `ICE_BIN_DIST` environment variable to `cpp` for testing:
+
+    set ICE_BIN_DIST=cpp
+    python allTests.py
 
 If everything worked out, you should see lots of `ok` messages. In case of a
 failure, the tests abort with `failed`.
 
 [1]: https://zeroc.com/distributions/ice
-[2]: https://doc.zeroc.com/display/Ice37/Supported+Platforms+for+Ice+3.7.0
+[2]: https://doc.zeroc.com/display/Rel/Supported+Platforms+for+Ice+3.7.0
+[3]: https://github.com/zeroc-ice/ice-builder-visualstudio

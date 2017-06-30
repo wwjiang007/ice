@@ -956,7 +956,6 @@ allTests(const Ice::CommunicatorPtr& communicator, bool collocated)
             test(promise.get_future().get());
         }
 
-
         {
             p->ice_pingAsync(nullptr);
         }
@@ -1460,7 +1459,6 @@ allTests(const Ice::CommunicatorPtr& communicator, bool collocated)
         {
         }
 
-
         try
         {
             p->ice_oneway()->opWithResultAsync().get();
@@ -1840,7 +1838,7 @@ allTests(const Ice::CommunicatorPtr& communicator, bool collocated)
         {
             test(p->opBatchCount() == 0);
             auto b1 = p->ice_batchOneway();
-            b1->opBatch();
+            b1->opBatchAsync().get();
             b1->opBatch();
             auto id = this_thread::get_id();
             promise<void> promise;
@@ -2400,6 +2398,14 @@ allTests(const Ice::CommunicatorPtr& communicator, bool collocated)
                 },
                 [](const exception_ptr& ex)
                 {
+                    try
+                    {
+                        rethrow_exception(ex);
+                    }
+                    catch(const std::exception& exc)
+                    {
+                        cerr << exc.what() << endl;
+                    }
                     test(false);
                 });
         promise.get_future().get();
@@ -2677,7 +2683,6 @@ allTests(const Ice::CommunicatorPtr& communicator, bool collocated)
         catch(const Ice::NoEndpointException&)
         {
         }
-
 
         try
         {

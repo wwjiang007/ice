@@ -1424,7 +1424,6 @@ Slice::CsVisitor::splitComment(const ContainedPtr& p, StringList& summaryLines, 
     }
 }
 
-
 void
 Slice::CsVisitor::writeDocComment(const ContainedPtr& p, const string& deprecateReason, const string& extraParam)
 {
@@ -1712,7 +1711,6 @@ Slice::CsVisitor::writeDocCommentTaskAsyncAMI(const OperationPtr& p, const strin
     {
         _out << nl << "/// " << extraParam3;
     }
-
 
     _out << nl << "/// <returns>The task object representing the asynchronous operation.</returns>";
 
@@ -2594,7 +2592,9 @@ Slice::Gen::TypesVisitor::visitExceptionEnd(const ExceptionPtr& p)
     const bool hasDataMemberInitializers = requiresDataMemberInitializers(dataMembers);
     if(hasDataMemberInitializers)
     {
-        _out << sp << nl << "private void _initDM()";
+        _out << sp;
+        emitGeneratedCodeAttribute();
+        _out << nl << "private void _initDM()";
         _out << sb;
         writeDataMemberInitializers(dataMembers, DotNet::Exception);
         _out << eb;
@@ -2635,7 +2635,9 @@ Slice::Gen::TypesVisitor::visitExceptionEnd(const ExceptionPtr& p)
     {
         if(!dataMembers.empty())
         {
-            _out << sp << nl << "private void _initDM" << spar << paramDecl << epar;
+            _out << sp;
+            emitGeneratedCodeAttribute();
+            _out << nl << "private void _initDM" << spar << paramDecl << epar;
             _out << sb;
             for(DataMemberList::const_iterator q = dataMembers.begin(); q != dataMembers.end(); ++q)
             {
@@ -3537,6 +3539,7 @@ Slice::Gen::ResultVisitor::visitOperation(const OperationPtr& p)
         string name = resultStructName(cl->name(), p->name(), true);
 
         _out << sp;
+        emitGeneratedCodeAttribute();
         _out << nl << "public struct " << name << " : Ice.MarshaledResult";
         _out << sb;
 
@@ -4158,6 +4161,11 @@ Slice::Gen::HelperVisitor::visitClassDefStart(const ClassDefPtr& p)
              << "bool synchronous" << epar;
         _out << sb;
 
+        string flatName = "_" + opName + "_name";
+        if(op->returnsData())
+        {
+            _out << nl << "iceCheckTwowayOnly(" << flatName << ");";
+        }
         if(returnTypeS.empty())
         {
             _out << nl << "var completed = "
@@ -4175,7 +4183,6 @@ Slice::Gen::HelperVisitor::visitClassDefStart(const ClassDefPtr& p)
 
         _out << eb;
 
-        string flatName = "_" + opName + "_name";
         _out << sp << nl << "private const string " << flatName << " = \"" << op->name() << "\";";
 
         //
@@ -4187,11 +4194,6 @@ Slice::Gen::HelperVisitor::visitClassDefStart(const ClassDefPtr& p)
              << "bool synchronous"
              << "IceInternal.OutgoingAsyncCompletionCallback completed" << epar;
         _out << sb;
-
-        if(op->returnsData())
-        {
-            _out << nl << "iceCheckAsyncTwowayOnly(" << flatName << ");";
-        }
 
         if(returnTypeS.empty())
         {
@@ -4434,6 +4436,10 @@ Slice::Gen::HelperVisitor::visitClassDefStart(const ClassDefPtr& p)
                 << epar;
         _out << sb;
 
+        if(op->returnsData())
+        {
+            _out << nl << "iceCheckAsyncTwowayOnly(" << flatName << ");";
+        }
         _out << nl << "var completed = new IceInternal.OperationAsyncResultCompletionCallback<" << delType;
         _out << ", " << (returnTypeS.empty() ? "object" : returnTypeS);
         _out << ">(";

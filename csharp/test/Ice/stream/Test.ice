@@ -12,7 +12,7 @@
 //
 // Suppress invalid metadata warnings
 //
-[["suppress-warning:invalid-metadata"]]
+[["suppress-warning:invalid-metadata, deprecated"]]
 
 #include <Ice/BuiltinSequences.ice>
 
@@ -40,7 +40,7 @@ struct SmallStruct
     double d;
     string str;
     MyEnum e;
-    MyClass* p;
+    MyInterface* p;
 }
 
 class OptionalClass
@@ -139,12 +139,10 @@ sequence<string> StringQueue;
 ["clr:generic:Queue"]
 sequence<SmallStruct> SmallStructQueue;
 
-
 ["clr:generic:List"]
 sequence<Ice::StringSeq> StringSList;
 ["clr:generic:Stack"]
 sequence<Ice::StringSeq> StringSStack;
-
 
 ["clr:generic:SortedDictionary"]
 dictionary<string, string> SortedStringStringD;

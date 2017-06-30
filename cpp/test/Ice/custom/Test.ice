@@ -88,12 +88,13 @@ sequence<C> CSeq;
 sequence<CList> CListSeq;
 ["cpp:type:std::list< ::Test::CSeq>"] sequence<CSeq> CSeqList;
 
-sequence<C*> CPrxSeq;
-["cpp:type:std::list< ::Test::CPrx>", "cpp11:type:std::list<std::shared_ptr<Ice::ObjectPrx>>"] sequence<C*> CPrxList;
+interface D {}
+sequence<D*> DPrxSeq;
+["cpp:type:std::list< ::Test::DPrx>", "cpp11:type:std::list<std::shared_ptr<DPrx>>"] sequence<D*> DPrxList;
 
-["cpp:type:std::list< ::Test::CPrxList>"] sequence<CPrxList> CPrxListList;
-sequence<CPrxList> CPrxListSeq;
-["cpp:type:std::list< ::Test::CPrxSeq>"] sequence<CPrxSeq> CPrxSeqList;
+["cpp:type:std::list< ::Test::DPrxList>"] sequence<DPrxList> DPrxListList;
+sequence<DPrxList> DPrxListSeq;
+["cpp:type:std::list< ::Test::DPrxSeq>"] sequence<DPrxSeq> DPrxSeqList;
 
 sequence<double> DoubleSeq;
 
@@ -161,8 +162,6 @@ interface TestIntf
     opVariableRangeType(["cpp:range:std::deque< ::Test::Variable>"] VariableList inSeq,
                         out ["cpp:range:std::deque< ::Test::Variable>"] VariableList outSeq);
 
-
-
     ["cpp:type:std::deque<bool>"] BoolSeq
     opBoolSeq(["cpp:type:std::deque<bool>"] BoolSeq inSeq, out ["cpp:type:std::deque<bool>"]BoolSeq outSeq);
 
@@ -183,11 +182,9 @@ interface TestIntf
     ["cpp:type:MyByteSeq"] ByteSeq
     opMyByteSeq(["cpp:type:MyByteSeq"] ByteSeq inSeq, out ["cpp:type:MyByteSeq"] ByteSeq outSeq);
 
-
     ["cpp:view-type:Util::string_view"] string
     opString(["cpp:view-type:Util::string_view"] string inString,
              out ["cpp:view-type:Util::string_view"] string outString);
-
 
     ["cpp:type:std::deque<std::string>"] StringSeq
     opStringSeq(["cpp:type:std::deque<std::string>"] StringSeq inSeq,
@@ -218,11 +215,11 @@ interface TestIntf
 
     EList opEList(EList inSeq, out EList outSeq);
 
-    ["cpp:type:std::deque< ::Test::CPrx>", "cpp11:type:std::deque<std::shared_ptr<Ice::ObjectPrx>>"] CPrxSeq
-    opCPrxSeq(["cpp:type:std::deque< ::Test::CPrx>", "cpp11:type:std::deque<std::shared_ptr<Ice::ObjectPrx>>"] CPrxSeq inSeq,
-              out ["cpp:type:std::deque< ::Test::CPrx>", "cpp11:type:std::deque<std::shared_ptr<Ice::ObjectPrx>>"] CPrxSeq outSeq);
+    ["cpp:type:std::deque< ::Test::DPrx>", "cpp11:type:std::deque<std::shared_ptr<::Test::DPrx>>"] DPrxSeq
+    opDPrxSeq(["cpp:type:std::deque< ::Test::DPrx>", "cpp11:type:std::deque<std::shared_ptr<::Test::DPrx>>"] DPrxSeq inSeq,
+              out ["cpp:type:std::deque< ::Test::DPrx>", "cpp11:type:std::deque<std::shared_ptr<::Test::DPrx>>"] DPrxSeq outSeq);
 
-    CPrxList opCPrxList(CPrxList inSeq, out CPrxList outSeq);
+    DPrxList opDPrxList(DPrxList inSeq, out DPrxList outSeq);
 
     ["cpp:type:std::deque< ::Test::CPtr>", "cpp11:type:std::deque<std::shared_ptr<Test::C>>"] CSeq
     opCSeq(["cpp:type:std::deque< ::Test::CPtr>", "cpp11:type:std::deque<std::shared_ptr<Test::C>>"] CSeq inSeq,
@@ -242,12 +239,10 @@ interface TestIntf
     opVarDict(["cpp:type:::Test::CustomMap<std::string, ::Ice::Int>"] StringIntDict idict,
               out ["cpp:type:::Test::CustomMap<std::string, ::Ice::Int>"] StringIntDict odict);
 
-
     ["cpp:view-type:::std::map< ::Ice::Int, ::Util::string_view>", "cpp:type:::Test::CustomMap< ::Ice::Int, std::string>"] IntStringDict
     opCustomIntStringDict(
         ["cpp:view-type:::std::map< ::Ice::Int, ::Util::string_view>", "cpp:type:::Test::CustomMap< ::Ice::Int, std::string>"] IntStringDict idict,
         out ["cpp:view-type:::std::map< ::Ice::Int, ::Util::string_view>", "cpp:type:::Test::CustomMap< ::Ice::Int, std::string>"] IntStringDict odict);
-
 
     ShortBuffer opShortBuffer(ShortBuffer inS, out ShortBuffer outS);
 

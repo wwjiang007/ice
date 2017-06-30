@@ -109,11 +109,37 @@ namespace IceInternal
             {
                 if(_instance == null)
                 {
+                    //
+                    // Ensure all the connections have been cleared, it's important to wait here
+                    // to prevent the timer destruction in IceInternal::Instance::destroy.
+                    //
+                    while(_connections.Count > 0)
+                    {
+                        System.Threading.Monitor.Wait(this);
+                    }
                     return;
                 }
+
+                if(_connections.Count > 0)
+                {
+                    //
+                    // Cancel the scheduled timer task and schedule it again now to clear the
+                    // connection set from the timer thread.
+                    //
+                    _instance.timer().cancel(this);
+                    _instance.timer().schedule(this, 0);
+                }
+
                 _instance = null;
-                _connections.Clear();
                 _changes.Clear();
+
+                //
+                // Wait for the connection set to be cleared by the timer thread.
+                //
+                while(_connections.Count > 0)
+                {
+                    System.Threading.Monitor.Wait(this);
+                }
             }
         }
 
@@ -209,6 +235,8 @@ namespace IceInternal
             {
                 if(_instance == null)
                 {
+                    _connections.Clear();
+                    System.Threading.Monitor.PulseAll(this);
                     return;
                 }
 
@@ -231,7 +259,6 @@ namespace IceInternal
                     return;
                 }
             }
-
 
             //
             // Monitor connections outside the thread synchronization, so

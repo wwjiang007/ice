@@ -1057,6 +1057,8 @@ Slice::Container::createSequence(const string& name, const TypePtr& type, const 
         _unit->error(msg);
     }
 
+    checkDeprecatedType(_unit, type);
+
     SequencePtr p = new Sequence(this, name, type, metaData, local);
     _contents.push_back(p);
     return p;
@@ -1130,6 +1132,8 @@ Slice::Container::createDictionary(const string& name, const TypePtr& keyType, c
             _unit->error(msg);
         }
     }
+
+    checkDeprecatedType(_unit, valueType);
 
     DictionaryPtr p = new Dictionary(this, name, keyType, keyMetaData, valueType, valueMetaData, local);
     _contents.push_back(p);
@@ -1533,7 +1537,6 @@ Slice::Container::unit() const
 {
     return SyntaxTreeBase::unit();
 }
-
 
 ModuleList
 Slice::Container::modules() const
@@ -6762,7 +6765,6 @@ Slice::cICompare(const std::string& s1, const std::string& s2)
     return c(s1, s2);
 }
 #endif
-
 
 // ----------------------------------------------------------------------
 // DerivedToBaseCompare

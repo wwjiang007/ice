@@ -62,7 +62,6 @@ class MyObjectI extends _MyObjectDisp
         throw new MySystemException();
     }
 
-
     //
     // AMD
     //
@@ -120,7 +119,7 @@ class MyObjectI extends _MyObjectDisp
 
         if(val == null || !val.equals("no"))
         {
-            throw new RetryException();
+            cb.ice_exception(new RetryException());
         }
     }
 

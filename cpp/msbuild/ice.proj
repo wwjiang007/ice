@@ -14,6 +14,8 @@
     <DefaultPlatformToolset Condition="'$(VisualStudioVersion)' == '10.0' And  '$(DefaultPlatformToolset)' == ''">v100</DefaultPlatformToolset>
     <IceTestSolution>ice.test.sln</IceTestSolution>
     <IceTestSolution Condition="'$(VisualStudioVersion)' == '10.0'">ice.test.v100.sln</IceTestSolution>
+    <IceConfiguration>$(Configuration)</IceConfiguration>
+    <SymbolServer Condition="'$(SymbolServer)' == ''">https://symbols.zeroc.com</SymbolServer>
   </PropertyGroup>
 
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
@@ -21,20 +23,26 @@
   <PropertyGroup Condition="'$(DefaultPlatformToolset)' == 'v140' OR '$(DefaultPlatformToolset)' == 'v141'">
     <Cpp11Compiler>yes</Cpp11Compiler>
     <UWPCompiler>yes</UWPCompiler>
+    <IceConfiguration Condition="$(Configuration.Contains('Release'))">Release</IceConfiguration>
+    <IceConfiguration Condition="$(Configuration.Contains('Debug'))">Debug</IceConfiguration>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(DefaultPlatformToolset)' == 'v140' OR '$(DefaultPlatformToolset)' == 'v120'">
     <OpenSSL>yes</OpenSSL>
   </PropertyGroup>
 
+  <Import Project="$(MSBuildThisFileDirectory)\..\..\config\icebuilder.props" />
   <Import Project="$(MSBuildThisFileDirectory)\..\..\config\Ice.common.targets" />
 
   <!--
       Restore NuGet packages.
   -->
   <Target Name="NuGetRestore" DependsOnTargets="GetNuGet">
-    <Message Text="VisualStudioVersion=$(VisualStudioVersion)" />
     <Exec Command="$(NuGetExe) restore $(MSBuildThisFileDirectory)ice.$(DefaultPlatformToolset).sln"/>
+  </Target>
+
+  <Target Name="RemovePackages">
+    <Exec Command="rmdir /s /q $(MSBuildThisFileDirectory)packages" Condition="Exists('$(MSBuildThisFileDirectory)packages')" />
   </Target>
 
   <Target Name="TestNuGetRestore" DependsOnTargets="GetNuGet" Condition="'$(ICE_BIN_DIST)' == 'all'">
@@ -46,9 +54,12 @@
     <Exec Command="$(NuGetExe) restore $(MSBuildThisFileDirectory)ice.testuwp.sln"/>
   </Target>
 
-  <!--
-      Ice for C++ builds.
-  -->
+  <Target Name="DownloadSymbols" DependsOnTargets="TestNuGetRestore" Condition="'$(ICE_BIN_DIST)' == 'all'">
+    <MakeDir Directories="$(TEMP)\SymbolCache" />
+    <Exec Command="symchk /r $(MSBuildThisFileDirectory)packages\zeroc.ice.$(DefaultPlatformToolset).$(IceJSONVersion)\build\native\bin\$(Platform)\$(IceConfiguration)\* /s SRV*$(TEMP)\SymbolCache*$(SymbolServer)" />
+  </Target>
+
+  <!-- Ice for C++ builds. -->
   <Choose>
     <!--
         If BuildAllConfigurations is set to yes we build all configurations that are
@@ -257,6 +268,7 @@
   <Target Name="NuGetPack"
           DependsOnTargets="BuildDist"
           Condition="$(BuildAllConfigurations) == 'yes'">
+
     <RemoveDir Directories="zeroc.ice.$(DefaultPlatformToolset)" />
 
     <MSBuild Projects="ice.nuget.targets"

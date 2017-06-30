@@ -386,7 +386,7 @@ struct ApplicationUpdateInfo
 
 /**
  *
- * The IceGrid administrative interface. </p>
+ * The IceGrid administrative interface.
  * <p class="Warning">Allowing access to this interface
  * is a security risk! Please see the IceGrid documentation
  * for further information.
@@ -453,7 +453,6 @@ interface Admin
      **/
     void updateApplication(ApplicationUpdateDescriptor descriptor)
         throws AccessDeniedException, DeploymentException, ApplicationNotExistException;
-
 
     /**
      *
@@ -1047,7 +1046,6 @@ interface Admin
      **/
     ["nonmutating", "cpp:const"] idempotent NodeInfo getNodeInfo(string name)
         throws NodeNotExistException, NodeUnreachableException;
-
 
     /**
      *
@@ -1657,7 +1655,6 @@ interface AdminSession extends Glacier2::Session
      **/
     ["nonmutating", "cpp:const"] idempotent Admin* getAdmin();
 
-
     /**
      *
      * Get a "template" proxy for admin callback objects.
@@ -1670,7 +1667,6 @@ interface AdminSession extends Glacier2::Session
      *
      **/
     ["cpp:const"] idempotent Object* getAdminCallbackTemplate();
-
 
     /**
      *

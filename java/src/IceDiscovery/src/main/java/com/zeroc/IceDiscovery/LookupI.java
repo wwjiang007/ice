@@ -11,6 +11,8 @@ package com.zeroc.IceDiscovery;
 
 import java.util.List;
 import java.util.ArrayList;
+import java.util.Set;
+import java.util.HashSet;
 import java.util.Map;
 import java.util.HashMap;
 import java.util.concurrent.CompletableFuture;
@@ -22,6 +24,7 @@ class LookupI implements Lookup
         Request(T id, int retryCount)
         {
             _id = id;
+            _requestId = java.util.UUID.randomUUID().toString();
             _retryCount = retryCount;
         }
 
@@ -45,9 +48,12 @@ class LookupI implements Lookup
         {
             _lookupCount = lookups.size();
             _failureCount = 0;
+            final com.zeroc.Ice.Identity id = new com.zeroc.Ice.Identity(_requestId, "");
             for(Map.Entry<LookupPrx, LookupReplyPrx> entry : lookups.entrySet())
             {
-                invokeWithLookup(domainId, entry.getKey(), entry.getValue());
+                invokeWithLookup(domainId,
+                                 entry.getKey(),
+                                 LookupReplyPrx.uncheckedCast(entry.getValue().ice_identity(id)));
             }
         }
 
@@ -59,6 +65,11 @@ class LookupI implements Lookup
                 return true;
             }
             return false;
+        }
+
+        String getRequestId()
+        {
+            return _requestId;
         }
 
         void scheduleTimer(long timeout)
@@ -76,6 +87,8 @@ class LookupI implements Lookup
         abstract void finished(com.zeroc.Ice.ObjectPrx proxy);
 
         abstract protected void invokeWithLookup(String domainId, LookupPrx lookup, LookupReplyPrx lookupReply);
+
+        private final String _requestId;
 
         protected int _retryCount;
         protected int _lookupCount;
@@ -127,25 +140,25 @@ class LookupI implements Lookup
             if(proxy != null || _proxies.isEmpty())
             {
                 sendResponse(proxy);
-                return;
             }
             else if(_proxies.size() == 1)
             {
-                sendResponse(_proxies.get(0));
-                return;
+                sendResponse(_proxies.toArray(new com.zeroc.Ice.ObjectPrx[1])[0]);
             }
-
-            List<com.zeroc.Ice.Endpoint> endpoints = new ArrayList<>();
-            com.zeroc.Ice.ObjectPrx result = null;
-            for(com.zeroc.Ice.ObjectPrx prx : _proxies)
+            else
             {
-                if(result == null)
+                List<com.zeroc.Ice.Endpoint> endpoints = new ArrayList<>();
+                com.zeroc.Ice.ObjectPrx result = null;
+                for(com.zeroc.Ice.ObjectPrx prx : _proxies)
                 {
-                    result = prx;
+                    if(result == null)
+                    {
+                        result = prx;
+                    }
+                    endpoints.addAll(java.util.Arrays.asList(prx.ice_getEndpoints()));
                 }
-                endpoints.addAll(java.util.Arrays.asList(prx.ice_getEndpoints()));
+                sendResponse(result.ice_endpoints(endpoints.toArray(new com.zeroc.Ice.Endpoint[endpoints.size()])));
             }
-            sendResponse(result.ice_endpoints(endpoints.toArray(new com.zeroc.Ice.Endpoint[endpoints.size()])));
         }
 
         @Override
@@ -174,7 +187,12 @@ class LookupI implements Lookup
             _futures.clear();
         }
 
-        private List<com.zeroc.Ice.ObjectPrx> _proxies = new ArrayList<>();
+        //
+        // We use a set because the same IceDiscovery plugin might return multiple times
+        // the same proxy if it's accessible through multiple network interfaces and if we
+        // also sent the request to multiple interfaces.
+        //
+        private Set<com.zeroc.Ice.ObjectPrx> _proxies = new HashSet<>();
         private long _start;
         private long _latency;
     }
@@ -370,31 +388,28 @@ class LookupI implements Lookup
         }
     }
 
-    synchronized void foundObject(com.zeroc.Ice.Identity id, com.zeroc.Ice.ObjectPrx proxy)
+    synchronized void foundObject(com.zeroc.Ice.Identity id, String requestId, com.zeroc.Ice.ObjectPrx proxy)
     {
         ObjectRequest request = _objectRequests.get(id);
-        if(request == null)
+        if(request != null && request.getRequestId().equals(requestId)) // Ignore responses from old requests
         {
-            return;
+            request.response(proxy);
+            request.cancelTimer();
+            _objectRequests.remove(id);
         }
-
-        request.response(proxy);
-        request.cancelTimer();
-        _objectRequests.remove(id);
     }
 
-    synchronized void foundAdapter(String adapterId, com.zeroc.Ice.ObjectPrx proxy, boolean isReplicaGroup)
+    synchronized void foundAdapter(String adapterId, String requestId, com.zeroc.Ice.ObjectPrx proxy,
+                                   boolean isReplicaGroup)
     {
         AdapterRequest request = _adapterRequests.get(adapterId);
-        if(request == null)
+        if(request != null && request.getRequestId().equals(requestId)) // Ignore responses from old requests
         {
-            return;
-        }
-
-        if(request.response(proxy, isReplicaGroup))
-        {
-            request.cancelTimer();
-            _adapterRequests.remove(adapterId);
+            if(request.response(proxy, isReplicaGroup))
+            {
+                request.cancelTimer();
+                _adapterRequests.remove(adapterId);
+            }
         }
     }
 
@@ -422,7 +437,6 @@ class LookupI implements Lookup
         request.finished(null);
         _objectRequests.remove(request.getId());
     }
-
 
     synchronized void objectRequestException(ObjectRequest request, Throwable ex)
     {

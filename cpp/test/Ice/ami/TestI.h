@@ -51,10 +51,11 @@ public:
 private:
 
     int _batchCount;
+    bool _shutdown;
 #ifdef ICE_CPP11_MAPPING
-    std::vector<std::function<void()>> _pending;
+    std::function<void()> _pending;
 #else
-    std::vector<Test::AMD_TestIntf_startDispatchPtr> _pending;
+    Test::AMD_TestIntf_startDispatchPtr _pending;
 #endif
 };
 

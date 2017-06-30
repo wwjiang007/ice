@@ -36,21 +36,21 @@ version 2.4 in the distribution. You cannot build the Ice for Java source
 distribution without an Internet connection. Gradle will download all required
 packages automatically from ZeroC's Maven repository located at
 
-    http://repo.zeroc.com/nexus/content/repositories/thirdparty
+    https://repo.zeroc.com/nexus/content/repositories/thirdparty
 
 ### Bzip2 Compression
 
 Ice for Java supports protocol compression using the bzip2 classes included
-with Apache Ant or available separately from [kohsuke.org]().
+with [Apache Commons Compress][4].
 
-The Maven package id for the bzip2 JAR file is as follows:
+The Maven package id for the commons-compress JAR file is as follows:
 
-    groupId=org.apache.tools, version=1.0, artifactId=bzip2
+    groupId=org.apache.commons, version=1.14, artifactId=commons-compress
 
 The demos and tests are automatically setup to enable protocol compression by
-adding the bzip2 JAR to the manifest class path. For your own applications you
-must add the bzip2 JAR to the application CLASSPATH to enable protocol
-compression.
+adding the commons-compress JAR to the manifest class path. For your own
+applications you must add the commons-compress JAR to the application CLASSPATH
+to enable protocol compression.
 
 > *These classes are a pure Java implementation of the bzip2 algorithm and
 therefore add significant latency to Ice requests.*
@@ -69,7 +69,7 @@ on Unix:
 
 On Windows:
 
-    > set ICE_HOME=C:\Program Files (x86)\ZeroC\Ice-3.7.0 (MSI installation)
+    > set ICE_HOME=C:\Program Files\ZeroC\Ice-3.7.0 (MSI installation)
 
 On Windows if you are using Ice for C++ from a source distribution, you must
 set the `CPP_PLATFORM` and `CPP_CONFIGURATION` environment variables to match the
@@ -112,11 +112,10 @@ The installation installs the following JAR files to `<prefix>/lib`.
     icebox-compat-3.7.0.jar
     icebt-compat-3.7.0.jar
     icediscovery-compat-3.7.0.jar
-    icegrid-compat-3.7.0jar
-    icegridgui.jar
+    icegrid-compat-3.7.0.jar
     icelocatordiscovery-compat-3.7.0.jar
     icepatch2-compat-3.7.0.jar
-    icestorm-compat-3.7.0jar
+    icestorm-compat-3.7.0.jar
 
 POM files are also installed for ease of deployment to a Maven-based
 distribution system.
@@ -143,6 +142,7 @@ window and change to the top-level directory. At the command prompt, execute:
 If everything worked out, you should see lots of `ok` messages. In case of a
 failure, the tests abort with `failed`.
 
-[1]: https://zeroc.com/download.html
-[2]: https://doc.zeroc.com/display/Ice37/Supported+Platforms+for+Ice+3.7.0
-[3]: http://gradle.org
+[1]: https://zeroc.com/distributions/ice
+[2]: https://doc.zeroc.com/display/Rel/Supported+Platforms+for+Ice+3.7.0
+[3]: https://gradle.org
+[4]: https://commons.apache.org/proper/commons-compress/

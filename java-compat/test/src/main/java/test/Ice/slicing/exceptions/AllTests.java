@@ -1162,9 +1162,10 @@ public class AllTests
         out.print("preserved exceptions... ");
         out.flush();
         {
-            Ice.ObjectAdapter adapter = communicator.createObjectAdapterWithEndpoints("Relay", "default");
+            Ice.ObjectAdapter adapter = communicator.createObjectAdapter("");
             RelayPrx relay = RelayPrxHelper.uncheckedCast(adapter.addWithUUID(new RelayI()));
             adapter.activate();
+            test.ice_getConnection().setAdapter(adapter);
 
             try
             {

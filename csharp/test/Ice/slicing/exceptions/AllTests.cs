@@ -1115,9 +1115,10 @@ public class AllTests : TestCommon.AllTests
         Write("preserved exceptions... ");
         Flush();
         {
-            Ice.ObjectAdapter adapter = communicator.createObjectAdapterWithEndpoints("Relay", "default");
+            Ice.ObjectAdapter adapter = communicator.createObjectAdapter("");
             RelayPrx relay = RelayPrxHelper.uncheckedCast(adapter.addWithUUID(new RelayI()));
             adapter.activate();
+            testPrx.ice_getConnection().setAdapter(adapter);
 
             try
             {
@@ -1228,6 +1229,7 @@ public class AllTests : TestCommon.AllTests
             adapter.destroy();
         }
         WriteLine("ok");
+
         return testPrx;
     }
 }

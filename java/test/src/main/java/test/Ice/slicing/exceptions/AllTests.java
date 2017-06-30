@@ -652,9 +652,10 @@ public class AllTests
         out.print("preserved exceptions... ");
         out.flush();
         {
-            com.zeroc.Ice.ObjectAdapter adapter = communicator.createObjectAdapterWithEndpoints("Relay", "default");
+            com.zeroc.Ice.ObjectAdapter adapter = communicator.createObjectAdapter("");
             RelayPrx relay = RelayPrx.uncheckedCast(adapter.addWithUUID(new RelayI()));
             adapter.activate();
+            test.ice_getConnection().setAdapter(adapter);
 
             try
             {

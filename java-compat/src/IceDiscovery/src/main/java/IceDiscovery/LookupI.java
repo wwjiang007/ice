@@ -11,6 +11,8 @@ package IceDiscovery;
 
 import java.util.List;
 import java.util.ArrayList;
+import java.util.Set;
+import java.util.HashSet;
 import java.util.Map;
 import java.util.HashMap;
 
@@ -21,6 +23,7 @@ class LookupI extends _LookupDisp
         Request(T id, int retryCount)
         {
             _id = id;
+            _requestId = java.util.UUID.randomUUID().toString();
             _retryCount = retryCount;
         }
 
@@ -48,9 +51,12 @@ class LookupI extends _LookupDisp
         {
             _lookupCount = lookups.size();
             _failureCount = 0;
+            final Ice.Identity id = new Ice.Identity(_requestId, "");
             for(Map.Entry<LookupPrx, LookupReplyPrx> entry : lookups.entrySet())
             {
-                invokeWithLookup(domainId, entry.getKey(), entry.getValue());
+                invokeWithLookup(domainId,
+                                 entry.getKey(),
+                                 LookupReplyPrxHelper.uncheckedCast(entry.getValue().ice_identity(id)));
             }
         }
 
@@ -63,6 +69,12 @@ class LookupI extends _LookupDisp
                 return true;
             }
             return false;
+        }
+
+        String
+        getRequestId()
+        {
+            return _requestId;
         }
 
         void
@@ -82,6 +94,8 @@ class LookupI extends _LookupDisp
         abstract void finished(Ice.ObjectPrx proxy);
 
         abstract protected void invokeWithLookup(String domainId, LookupPrx lookup, LookupReplyPrx lookupReply);
+
+        private final String _requestId;
 
         protected int _retryCount;
         protected int _lookupCount;
@@ -136,25 +150,25 @@ class LookupI extends _LookupDisp
             if(proxy != null || _proxies.isEmpty())
             {
                 sendResponse(proxy);
-                return;
             }
             else if(_proxies.size() == 1)
             {
-                sendResponse(_proxies.get(0));
-                return;
+                sendResponse(_proxies.toArray(new Ice.ObjectPrx[1])[0]);
             }
-
-            List<Ice.Endpoint> endpoints = new ArrayList<Ice.Endpoint>();
-            Ice.ObjectPrx result = null;
-            for(Ice.ObjectPrx prx : _proxies)
+            else
             {
-                if(result == null)
+                List<Ice.Endpoint> endpoints = new ArrayList<Ice.Endpoint>();
+                Ice.ObjectPrx result = null;
+                for(Ice.ObjectPrx prx : _proxies)
                 {
-                    result = prx;
+                    if(result == null)
+                    {
+                        result = prx;
+                    }
+                    endpoints.addAll(java.util.Arrays.asList(prx.ice_getEndpoints()));
                 }
-                endpoints.addAll(java.util.Arrays.asList(prx.ice_getEndpoints()));
+                sendResponse(result.ice_endpoints(endpoints.toArray(new Ice.Endpoint[endpoints.size()])));
             }
-            sendResponse(result.ice_endpoints(endpoints.toArray(new Ice.Endpoint[endpoints.size()])));
         }
 
         @Override
@@ -196,7 +210,12 @@ class LookupI extends _LookupDisp
             _callbacks.clear();
         }
 
-        private List<Ice.ObjectPrx> _proxies = new ArrayList<Ice.ObjectPrx>();
+        //
+        // We use a set because the same IceDiscovery plugin might return multiple times
+        // the same proxy if it's accessible through multiple network interfaces and if we
+        // also sent the request to multiple interfaces.
+        //
+        private Set<Ice.ObjectPrx> _proxies = new HashSet<Ice.ObjectPrx>();
         private long _start;
         private long _latency;
     };
@@ -413,32 +432,28 @@ class LookupI extends _LookupDisp
     }
 
     synchronized void
-    foundObject(Ice.Identity id, Ice.ObjectPrx proxy)
+    foundObject(Ice.Identity id, String requestId, Ice.ObjectPrx proxy)
     {
         ObjectRequest request = _objectRequests.get(id);
-        if(request == null)
+        if(request != null && request.getRequestId().equals(requestId)) // Ignore responses from old requests
         {
-            return;
+            request.response(proxy);
+            request.cancelTimer();
+            _objectRequests.remove(id);
         }
-
-        request.response(proxy);
-        request.cancelTimer();
-        _objectRequests.remove(id);
     }
 
     synchronized void
-    foundAdapter(String adapterId, Ice.ObjectPrx proxy, boolean isReplicaGroup)
+    foundAdapter(String adapterId, String requestId, Ice.ObjectPrx proxy, boolean isReplicaGroup)
     {
         AdapterRequest request = _adapterRequests.get(adapterId);
-        if(request == null)
+        if(request != null && request.getRequestId().equals(requestId)) // Ignore responses from old requests
         {
-            return;
-        }
-
-        if(request.response(proxy, isReplicaGroup))
-        {
-            request.cancelTimer();
-            _adapterRequests.remove(adapterId);
+            if(request.response(proxy, isReplicaGroup))
+            {
+                request.cancelTimer();
+                _adapterRequests.remove(adapterId);
+            }
         }
     }
 

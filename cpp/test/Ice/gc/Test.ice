@@ -9,6 +9,8 @@
 
 #pragma once
 
+[["suppress-warning:deprecated"]]
+
 module Test
 {
 
@@ -61,7 +63,6 @@ class Node
 // Sequence of classes defined above.
 
 // Sequence of structs defined above.
-
 
 sequence<C2Dict> C2DictSeq;             // Sequence of dictionary.
 
