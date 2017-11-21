@@ -33,14 +33,19 @@ buildscript {
         mavenCentral()
 
         maven {
-            url "https://repo.zeroc.com/nexus/content/repositories/releases"
+            url "https://plugins.gradle.org/m2/"
         }
     }
     dependencies {
-        classpath group: 'com.zeroc.gradle.ice-builder', name: 'slice', version: "${iceBuilderVersion}"
+        classpath group: "${iceBuilderClassPath}", name: 'slice', version: "${iceBuilderVersion}"
     }
 }
 
+//
+// We do not use the new gradle Plugin DSL because on debian we want to use the plug-in
+// from gradle-ice-builder-plugin package and this is not possible when using gradle 3.2
+// included in stretch and the Plugin DSL.
+//
 if (!project.plugins.findPlugin(com.zeroc.gradle.icebuilder.slice.SlicePlugin)) {
     project.apply(plugin: com.zeroc.gradle.icebuilder.slice.SlicePlugin)
 }
@@ -50,7 +55,7 @@ slice {
     cppPlatform = this.cppPlatform
     if(!System.env.ICE_BIN_DIST?.split(" ").find{ it == 'all' || it.contains('java')}) {
         iceHome =  this.hasProperty('iceHome') ? this.iceHome
-            : new File(project.ext.topSrcDir).getCanonicalPath()
+            : System.getenv("ICE_HOME") != null ? System.env.ICE_HOME : new File(project.ext.topSrcDir).getCanonicalPath()
     }
 }
 
@@ -96,10 +101,6 @@ if ((prefix.startsWith("/usr") || prefix.startsWith("/usr/local")) && !prefix.st
     ext.binDir = prefix + "/bin"
 }
 
-// Check if we are building against source distribution
-def iceCppDir = slice.srcDist ? [slice.iceHome, "cpp"].join(File.separator) : slice.iceHome
-def iceSrcDist = false
-
 // Check is DESTDIR is set (non-Windows)
 if (isWindows) {
     ext.DESTDIR = ""
@@ -133,7 +134,7 @@ ext.searchFile = { List<Closure> places, List<String> searchPaths ->
 }
 
 ext.localDependency = { artifactId ->
-    if (project.slice.srcDist) {
+    if (project.slice.srcDist || System.env.ICE_BIN_DIST == "cpp") {
         return project(":${artifactId}")
     } else {
         return "com.zeroc:${artifactId}:${project.version}"

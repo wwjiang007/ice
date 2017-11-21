@@ -2185,7 +2185,7 @@ IcePy::Invocation::validateException(const OperationPtr& op, PyObject* ex) const
 {
     for(ExceptionInfoList::const_iterator p = op->exceptions.begin(); p != op->exceptions.end(); ++p)
     {
-        if(PyObject_IsInstance(ex, (*p)->pythonType.get()))
+        if(PyObject_IsInstance(ex, (*p)->pythonType))
         {
             return true;
         }
@@ -2870,12 +2870,14 @@ IcePy::NewAsyncInvocation::exception(const Ice::Exception& ex)
 {
     AdoptThread adoptThread; // Ensure the current thread is able to call into Python.
 
+    PyObjectHandle exh = convertException(ex); // NOTE: This can release the GIL
+
     if(!_future)
     {
         //
         // The future hasn't been created yet, which means invoke() is still running. Save the exception for later.
         //
-        _exception = convertException(ex);
+        _exception = exh.release();
         _done = true;
         return;
     }
@@ -2884,7 +2886,6 @@ IcePy::NewAsyncInvocation::exception(const Ice::Exception& ex)
     _future = 0; // Break cyclic dependency.
     _done = true;
 
-    PyObjectHandle exh = convertException(ex);
     assert(exh.get());
     PyObjectHandle tmp = callMethod(future.get(), "set_exception", exh.get());
     if(PyErr_Occurred())
@@ -3889,7 +3890,7 @@ IcePy::TypedUpcall::dispatch(PyObject* servant, const pair<const Ice::Byte*, con
                 ParamInfoPtr info = *p;
                 if(!info->optional)
                 {
-                    void* closure = reinterpret_cast<void*>(info->pos);
+                    void* closure = reinterpret_cast<void*>(static_cast<Py_ssize_t>(info->pos));
                     info->type->unmarshal(&is, info, args.get(), closure, false, &info->metaData);
                 }
             }
@@ -3902,7 +3903,7 @@ IcePy::TypedUpcall::dispatch(PyObject* servant, const pair<const Ice::Byte*, con
                 ParamInfoPtr info = *p;
                 if(is.readOptional(info->tag, info->type->optionalFormat()))
                 {
-                    void* closure = reinterpret_cast<void*>(info->pos);
+                    void* closure = reinterpret_cast<void*>(static_cast<Py_ssize_t>(info->pos));
                     info->type->unmarshal(&is, info, args.get(), closure, true, &info->metaData);
                 }
                 else

@@ -120,6 +120,12 @@ Ice::Object::ice_clone() const
     throw CloneNotImplementedException(__FILE__, __LINE__);
     return 0; // avoid warning with some compilers
 }
+
+Ice::SlicedDataPtr
+Ice::Object::ice_getSlicedData() const
+{
+    return 0;
+}
 #endif
 
 bool
@@ -328,14 +334,12 @@ Ice::Object::_iceCheckMode(OperationMode expected, OperationMode received)
         }
         else
         {
-            Ice::MarshalException ex(__FILE__, __LINE__);
             std::ostringstream reason;
             reason << "unexpected operation mode. expected = "
                    << operationModeToString(expected)
                    << " received = "
                    << operationModeToString(received);
-            ex.reason = reason.str();
-            throw ex;
+            throw Ice::MarshalException(__FILE__, __LINE__, reason.str());
         }
     }
 }

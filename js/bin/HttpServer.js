@@ -28,17 +28,15 @@ function Init()
 
     var TestData = {
         cssDeps: [
-            "https://cdnjs.cloudflare.com/ajax/libs/foundation/5.3.3/css/foundation.min.css",
-            "https://cdnjs.cloudflare.com/ajax/libs/animo.js/1.0.3/animate-animo.min.css"
+            "https://cdnjs.cloudflare.com/ajax/libs/foundation/5.5.3/css/foundation.min.css"
         ],
         jsDeps: [
             "https://cdnjs.cloudflare.com/ajax/libs/jquery/2.2.4/jquery.min.js",
             "https://cdnjs.cloudflare.com/ajax/libs/modernizr/2.8.3/modernizr.min.js",
-            "https://cdnjs.cloudflare.com/ajax/libs/foundation/5.3.3/js/foundation.min.js",
+            "https://cdnjs.cloudflare.com/ajax/libs/foundation/5.5.3/js/foundation.min.js",
             "https://cdnjs.cloudflare.com/ajax/libs/spin.js/2.3.2/spin.min.js",
-            "https://cdnjs.cloudflare.com/ajax/libs/URI.js/1.18.10/URI.min.js",
-            "https://cdnjs.cloudflare.com/ajax/libs/animo.js/1.0.3/animo.min.js",
-            "http://spin.js.org/jquery.spin.js"
+            "https://cdnjs.cloudflare.com/ajax/libs/URI.js/1.18.12/URI.min.js",
+            "/assets/jquery.spin.js"
         ]
     };
 
@@ -49,9 +47,13 @@ function Init()
     }
 
     var libraries = ["/lib/Ice.js", "/lib/Ice.min.js",
-                    "/lib/Glacier2.js", "/lib/Glacier2.min.js",
-                    "/lib/IceStorm.js", "/lib/IceStorm.min.js",
-                    "/lib/IceGrid.js", "/lib/IceGrid.min.js",];
+                     "/lib/Glacier2.js", "/lib/Glacier2.min.js",
+                     "/lib/IceStorm.js", "/lib/IceStorm.min.js",
+                     "/lib/IceGrid.js", "/lib/IceGrid.min.js",
+                     "/lib/es5/Ice.js", "/lib/es5/Ice.min.js",
+                     "/lib/es5/Glacier2.js", "/lib/es5/Glacier2.min.js",
+                     "/lib/es5/IceStorm.js", "/lib/es5/IceStorm.min.js",
+                     "/lib/es5/IceGrid.js", "/lib/es5/IceGrid.min.js"];
 
     TestData.TestSuites = fs.readFileSync(path.join(__dirname, "..", "test", "Common", "TestSuites.json"), "utf8");
     var TestSuites = JSON.parse(TestData.TestSuites);
@@ -147,12 +149,16 @@ function Init()
                             TestData.scripts =
                             [
                                 "/node_modules/babel-polyfill/dist/polyfill.js",
-                                "/node_modules/regenerator-runtime/runtime.js",
                                 "/lib/es5/Ice.js",
-                                "/test/Common/TestRunner.js",
-                                "/test/Common/TestSuite.js",
+                                "/test/es5/Common/TestRunner.js",
+                                "/test/es5/Common/TestSuite.js",
                                 "/test/es5/Common/Controller.js"
                             ].concat(testSuite.files);
+
+                            TestData.scripts = TestData.scripts.map(function(f)
+                                {
+                                    return f.replace("/lib/Glacier2.js", "/lib/es5/Glacier2.js");
+                                });
                         }
                         else
                         {
@@ -167,10 +173,7 @@ function Init()
                     }
                     else
                     {
-                        TestData.scripts =
-                            [
-                                "/test/Common/TestSuite.js"
-                            ];
+                        TestData.scripts = es5 ? ["/test/es5/Common/TestSuite.js"] : ["/test/Common/TestSuite.js"];
                     }
                     TestData.languages = languages.slice();
                     if(testSuite.files.indexOf("Server.js") >= 0)
@@ -188,9 +191,9 @@ function Init()
             var es5 = matchController[1].indexOf("es5/") !== -1;
             var m = es5 ? matchController[1].replace("es5/", "") : matchController[1];
             var testpath = path.resolve(path.join(this._basePath, "test", matchController[1]))
+            var worker = req.url.query.worker == "True";
             var scripts = es5 ? [
                 "/node_modules/babel-polyfill/dist/polyfill.js",
-                "/node_modules/regenerator-runtime/runtime.js",
                 "/lib/es5/Ice.js",
                 "/test/es5/Common/Controller.js",
                 "/test/es5/Common/ControllerI.js",
@@ -199,6 +202,7 @@ function Init()
                 "/test/Common/Controller.js",
                 "/test/Common/ControllerI.js",
             ];
+
             var testSuite = TestSuites[m];
             if(testSuite)
             {
@@ -221,9 +225,24 @@ function Init()
             {
                 TestData.scripts = scripts.concat(fs.readdirSync(testpath).filter(function(f) { return path.extname(f) === ".js"; }))
             }
+
+            if(worker)
+            {
+                // Do not include babel polyfill when using workers, it is bundle with the controllerwoker
+                TestData.workerScripts = TestData.scripts.filter(script => script.indexOf("/babel-polyfill/") === -1);
+            }
+
             res.writeHead(200, {"Content-Type": "text/html"});
             res.end(controller.render(TestData))
             console.log("HTTP/200 (Ok) " + req.method + " " + req.url.pathname);
+        }
+        else if(req.url.pathname === '/start')
+        {
+            res.writeHead(302,
+            {
+                "Location": "/test/Ice/acm/controller.html&port=15002"
+            });
+            res.end();
         }
         else
         {

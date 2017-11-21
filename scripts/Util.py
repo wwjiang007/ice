@@ -9,6 +9,8 @@
 
 import os, sys, runpy, getopt, traceback, types, threading, time, datetime, re, itertools, random, subprocess, shutil, copy, inspect
 
+import xml.sax.saxutils
+
 isPython2 = sys.version_info[0] == 2
 if isPython2:
     import Queue as queue
@@ -47,6 +49,13 @@ def val(v, escapeQuotes=False, quoteValue=True):
             return "\"{0}\"".format(v)
     else:
         return str(v)
+
+def escapeXml(s):
+    # Remove backspace characters from the output (they aren't accepted by Jenkins XML parser)
+    if isPython2:
+        return xml.sax.saxutils.escape("".join(ch for ch in unicode(s.decode("utf-8")) if ch != u"\u0008").encode("utf-8"))
+    else:
+        return xml.sax.saxutils.escape("".join(ch for ch in s if ch != u"\u0008"))
 
 def getIceSoVersion():
     config = open(os.path.join(toplevel, "cpp", "include", "IceUtil", "Config.h"), "r")
@@ -109,8 +118,11 @@ class Platform:
     def getLdPathEnvName(self):
         return "LD_LIBRARY_PATH"
 
+    def getInstallDir(self, mapping, current, envName):
+        return os.environ.get(envName, "/usr")
+
     def getIceInstallDir(self, mapping, current):
-        return os.environ.get("ICE_HOME", "/usr")
+        return self.getInstallDir(mapping, current, "ICE_HOME")
 
     def getSliceDir(self, iceDir):
         if iceDir.startswith("/usr"):
@@ -133,7 +145,7 @@ class Platform:
 class Darwin(Platform):
 
     def getFilters(self, config):
-        if config.buildPlatform in ["iphoneos", "iphonesimulator"]:
+        if config.buildPlatform in ["iphoneos", "iphonesimulator", "macosx"] and "xcodesdk" in config.buildConfig:
             return (["Ice/.*", "IceSSL/configuration"],
                     ["Ice/background",
                      "Ice/echo",
@@ -154,8 +166,8 @@ class Darwin(Platform):
     def getLdPathEnvName(self):
         return "DYLD_LIBRARY_PATH"
 
-    def getIceInstallDir(self, mapping, current):
-        return os.environ.get("ICE_HOME", "/usr/local")
+    def getInstallDir(self, mapping, current, envName):
+        return os.environ.get(envName, "/usr/local")
 
 class AIX(Platform):
 
@@ -280,8 +292,10 @@ class Windows(Platform):
                     self.compiler = "VC120"
                 elif out.find("Version 19.00.") != -1:
                     self.compiler = "VC140"
-                elif out.find("Version 19.10.") != -1:
+                elif out.find("Version 19.10.") != -1 or out.find("Version 19.11.") != -1:
                     self.compiler = "VC141"
+                else:
+                    raise RuntimeError("Unknown compiler version:\n{0}".format(out))
             except:
                 self.compiler = ""
         return self.compiler
@@ -303,7 +317,9 @@ class Windows(Platform):
         buildConfig = current.driver.configs[mapping].buildConfig
         config = "Debug" if buildConfig.find("Debug") >= 0 else "Release"
 
-        if current.driver.useIceBinDist(mapping):
+        if current.config.uwp and not current.config.protocol in ["ssl", "wss"]:
+            return ""
+        elif current.driver.useIceBinDist(mapping):
             version = self.getNugetPackageVersion()
             packageSuffix = self.getPlatformToolset() if isinstance(mapping, CppMapping) else "net"
             package = os.path.join(mapping.path, "msbuild", "packages", "{0}".format(
@@ -348,8 +364,7 @@ class Windows(Platform):
     def getLdPathEnvName(self):
         return "PATH"
 
-    def getIceInstallDir(self, mapping, current):
-
+    def getInstallDir(self, mapping, current, envName):
         platform = current.config.buildPlatform
         config = "Debug" if current.config.buildConfig.find("Debug") >= 0 else "Release"
         version = self.getNugetPackageVersion()
@@ -357,11 +372,15 @@ class Windows(Platform):
         package = os.path.join(mapping.path, "msbuild", "packages", "{0}".format(
             mapping.getNugetPackage(packageSuffix, version))) if hasattr(mapping, "getNugetPackage") else None
 
-        iceHome = os.environ.get("ICE_HOME", "")
-        if isinstance(mapping, CppMapping) and not package and not os.path.exists(iceHome):
+        package = None
+        if hasattr(mapping, "getNugetPackage"):
+            package = os.path.join(mapping.path, "msbuild", "packages", mapping.getNugetPackage(packageSuffix, version))
+
+        home = os.environ.get(envName, "")
+        if isinstance(mapping, CppMapping) and not package and not os.path.exists(home):
             raise RuntimeError("Cannot detect a valid C++ distribution")
 
-        return package if package and os.path.exists(package) else iceHome
+        return package if package and os.path.exists(package) else home
 
     def canRun(self, mapping, current):
         #
@@ -980,13 +999,14 @@ class Process(Runnable):
     processType = None
 
     def __init__(self, exe=None, outfilters=None, quiet=False, args=None, props=None, envs=None, desc=None,
-                 mapping=None, preexec_fn=None):
+                 mapping=None, preexec_fn=None, traceProps=None):
         Runnable.__init__(self, desc)
         self.exe = exe
         self.outfilters = outfilters or []
         self.quiet = quiet
         self.args = args or []
         self.props = props or {}
+        self.traceProps = traceProps or {}
         self.envs = envs or {}
         self.mapping = mapping
         self.preexec_fn = preexec_fn
@@ -1062,6 +1082,9 @@ class Process(Runnable):
                 try:
                     process.waitSuccess(exitstatus=exitstatus, timeout=30)
                     break
+                except KeyboardInterrupt:
+                    current.driver.setInterrupt(True)
+                    raise
                 except Expect.TIMEOUT:
                     if watchDog and watchDog.timedOut(timeout):
                         print("process {0} is hanging - {1}".format(process, time.strftime("%x %X")))
@@ -1102,6 +1125,12 @@ class Process(Runnable):
         allEnvs.update(self.envs(self, current) if callable(self.envs) else self.envs)
         return allEnvs
 
+    def getEffectiveTraceProps(self, current):
+        traceProps = {}
+        traceProps.update(current.testcase.getTraceProps(self, current))
+        traceProps.update(self.traceProps(self, current) if callable(self.traceProps) else self.traceProps)
+        return traceProps
+
     def start(self, current, args=[], props={}, watchDog=None):
         allArgs = self.getEffectiveArgs(current, args)
         allProps = self.getEffectiveProps(current, props)
@@ -1129,6 +1158,9 @@ class Process(Runnable):
                         try:
                             process.waitSuccess(exitstatus=exitstatus, timeout=30)
                             break
+                        except KeyboardInterrupt:
+                            current.driver.setInterrupt(True)
+                            raise
                         except Expect.TIMEOUT:
                             print("process {0} is hanging on shutdown - {1}".format(process, time.strftime("%x %X")))
                             if current.driver.isInterrupted():
@@ -1138,6 +1170,10 @@ class Process(Runnable):
                     process.terminate()
                 if not self.quiet: # Write the output to the test case (but not on stdout)
                     current.write(self.getOutput(current), stdout=False)
+
+    def teardown(self, current, success):
+        if self in current.processes:
+            current.processes[self].teardown(current, success)
 
     def expect(self, current, pattern, timeout=60):
         assert(self in current.processes and isinstance(current.processes[self], Expect.Expect))
@@ -1271,6 +1307,11 @@ class EchoServer(Server):
     def __init__(self):
         Server.__init__(self, mapping=Mapping.getByName("cpp"), quiet=True, waitForShutdown=False)
 
+    def getProps(self, current):
+        props = Server.getProps(self, current)
+        props["Ice.MessageSizeMax"] = 8192 # Don't limit the amount of data to transmit between client/server
+        return props
+
     def getCommandLine(self, current):
         current.push(self.mapping.findTestSuite("Ice/echo").findTestCase("server"))
         try:
@@ -1290,7 +1331,7 @@ class EchoServer(Server):
 class TestCase(Runnable):
 
     def __init__(self, name, client=None, clients=None, server=None, servers=None, args=None, props=None, envs=None,
-                 options=None, desc=None):
+                 options=None, desc=None, traceProps=None):
         Runnable.__init__(self, desc)
 
         self.name = name
@@ -1300,6 +1341,7 @@ class TestCase(Runnable):
         self.options = options or {}
         self.args = args or []
         self.props = props or {}
+        self.traceProps = traceProps or {}
         self.envs = envs or {}
 
         #
@@ -1397,6 +1439,9 @@ class TestCase(Runnable):
 
     def getProps(self, process, current):
         return self.props
+
+    def getTraceProps(self, process, current):
+        return self.traceProps
 
     def getEnv(self, process, current):
         return self.envs
@@ -1496,11 +1541,17 @@ class TestCase(Runnable):
     def run(self, current):
         try:
             current.push(self)
-            current.result.started(self)
+            if not self.parent:
+                current.result.started(current)
+            self.setup(current)
             self.runWithDriver(current)
-            current.result.succeeded(self)
+            self.teardown(current, True)
+            if not self.parent:
+                current.result.succeeded(current)
         except Exception as ex:
-            current.result.failed(self, traceback.format_exc() if current.driver.debug else str(ex))
+            self.teardown(current, False)
+            if not self.parent:
+                current.result.failed(current, traceback.format_exc() if current.driver.debug else str(ex))
             raise
         finally:
             current.pop()
@@ -1545,15 +1596,18 @@ class ClientAMDServerTestCase(ClientServerTestCase):
 
 class Result:
 
+    getKey = lambda self, current: (current.testcase, current.config) if isinstance(current, Driver.Current) else current
+    getDesc = lambda self, current: current.desc if isinstance(current, Driver.Current) else ""
+
     def __init__(self, testsuite, writeToStdout):
         self.testsuite = testsuite
-        self._skipped = []
         self._failed = {}
-        self._succeeded = []
+        self._skipped = {}
         self._stdout = StringIO()
         self._writeToStdout = writeToStdout
         self._testcases = {}
         self._duration = 0
+        self._testCaseDuration = 0;
 
     def start(self):
         self._duration = time.time()
@@ -1561,14 +1615,20 @@ class Result:
     def finished(self):
         self._duration = time.time() - self._duration
 
-    def started(self, testcase):
+    def started(self, current):
+        self._testCaseDuration = time.time();
         self._start = self._stdout.tell()
 
-    def failed(self, testcase, exception):
+    def failed(self, current, exception):
+        print(exception)
+        key = self.getKey(current)
+        self._testCaseDuration = time.time() - self._testCaseDuration;
         self.writeln("\ntest in {0} failed:\n{1}".format(self.testsuite, exception))
-        self._testcases[testcase] = (self._start, self._stdout.tell())
-        self._failed[testcase] = exception
-        output = self.getOutput(testcase)
+        self._testcases[key] = (self._start, self._stdout.tell(), self._testCaseDuration, self.getDesc(current))
+        self._failed[key] = exception
+
+        # If ADDRINUSE, dump the current processes
+        output = self.getOutput(key)
         for s in ["EADDRINUSE", "Address already in use"]:
             if output.find(s) >= 0:
                 if isinstance(platform, Windows):
@@ -1577,9 +1637,14 @@ class Result:
                 else:
                     self.writeln(run("lsof -n -P -i; ps ax"))
 
-    def succeeded(self, testcase):
-        self._testcases[testcase] = (self._start, self._stdout.tell())
-        self._succeeded.append(testcase)
+    def succeeded(self, current):
+        key = self.getKey(current)
+        self._testCaseDuration = time.time() - self._testCaseDuration;
+        self._testcases[key] = (self._start, self._stdout.tell(), self._testCaseDuration, self.getDesc(current))
+
+    def skipped(self, current, reason):
+        self.writeln("skipped, " + reason)
+        self._skipped[self.getKey(current)] = reason
 
     def isSuccess(self):
         return len(self._failed) == 0
@@ -1590,10 +1655,10 @@ class Result:
     def getDuration(self):
         return self._duration
 
-    def getOutput(self, testcase=None):
-        if testcase:
-            if testcase in self._testcases:
-                (start, end) = self._testcases[testcase]
+    def getOutput(self, key=None):
+        if key:
+            if key in self._testcases:
+                (start, end, duration, desc) = self._testcases[key]
                 self._stdout.seek(start)
                 try:
                     return self._stdout.read(end - start)
@@ -1631,6 +1696,51 @@ class Result:
                 print(str(msg.encode("utf-8")).replace("\\\\", "\\"))
         self._stdout.write(msg)
         self._stdout.write("\n")
+
+    def writeAsXml(self, out, hostname=""):
+        out.write('  <testsuite tests="{0}" failures="{1}" skipped="{2}" time="{3:.9f}" name="{5}/{4}">\n'
+                    .format(len(self._testcases) - 2,
+                            len(self._failed),
+                            len(self._skipped),
+                            self._duration,
+                            self.testsuite,
+                            self.testsuite.getMapping()))
+
+        for (k, v) in self._testcases.items():
+            if isinstance(k, str):
+                # Don't keep track of setup/teardown steps
+                continue
+
+            (tc, cf) = k
+            (s, e, d, c) = v
+            if c:
+                name = "{0} [{1}]".format(tc, c)
+            else:
+                name = str(tc)
+            if hostname:
+                name += " on " + hostname
+            out.write('    <testcase name="{0}" time="{1:.9f}" classname="{2}.{3}">\n'
+                      .format(name,
+                              d,
+                              self.testsuite.getMapping(),
+                              self.testsuite.getId().replace("/", ".")))
+            if k in self._failed:
+                last = self._failed[k].strip().split('\n')
+                if len(last) > 0:
+                    last = last[len(last) - 1]
+                if hostname:
+                    last = "Failed on {0}\n{1}".format(hostname, last)
+                out.write('      <failure message="{1}">{0}</failure>\n'.format(escapeXml(self._failed[k]), last))
+            elif k in self._skipped:
+                out.write('      <skipped message="{0}"/>\n'.format(escapeXml(self._skipped[k])))
+            out.write('      <system-out>\n')
+            if hostname:
+                out.write('Running on {0}\n'.format(hostname))
+            out.write(escapeXml(self.getOutput(k)))
+            out.write('      </system-out>\n')
+            out.write('    </testcase>\n')
+
+        out.write(  '</testsuite>\n')
 
 class TestSuite:
 
@@ -1739,6 +1849,10 @@ class LocalProcessController(ProcessController):
 
     class LocalProcess(Expect.Expect):
 
+        def __init__(self, traceFile, *args, **kargs):
+            Expect.Expect.__init__(self, *args, **kargs)
+            self.traceFile = traceFile
+
         def waitReady(self, ready, readyCount, startTimeout):
             if ready:
                 self.expect("%s ready\n" % ready, timeout = startTimeout)
@@ -1749,6 +1863,13 @@ class LocalProcessController(ProcessController):
 
         def isTerminated(self):
             return self.p is None
+
+        def teardown(self, current, success):
+            if self.traceFile:
+                if success or current.driver.isInterrupted():
+                    os.remove(self.traceFile)
+                else:
+                    current.writeln("saved {0}".format(self.traceFile))
 
     def getHost(self, current):
         # Depending on the configuration, either use an IPv4, IPv6 or BT address for Ice.Default.Host
@@ -1775,6 +1896,16 @@ class LocalProcessController(ProcessController):
             "icedir" : current.driver.getIceDir(current.testcase.getMapping(), current),
         }
 
+        traceFile = ""
+        if not isinstance(process.getMapping(current), JavaScriptMapping):
+            traceProps = process.getEffectiveTraceProps(current)
+            if traceProps:
+                traceFile = os.path.join(current.testsuite.getPath(),
+                                         "{0}-{1}.log".format(process.exe or current.testcase.getProcessType(process),
+                                                              time.strftime("%m%d%y-%H%M")))
+                traceProps["Ice.StdErr"] = traceFile
+            props.update(traceProps)
+
         args = ["--{0}={1}".format(k, val(v)) for k,v in props.items()] + [val(a) for a in args]
         for k, v in envs.items():
             envs[k] = val(v, quoteValue=False)
@@ -1795,13 +1926,14 @@ class LocalProcessController(ProcessController):
         env.update(envs)
         mapping = process.getMapping(current)
         cwd = mapping.getTestCwd(process, current)
-        process = LocalProcessController.LocalProcess(cmd,
+        process = LocalProcessController.LocalProcess(command=cmd,
                                                       startReader=False,
                                                       env=env,
                                                       cwd=cwd,
                                                       desc=process.desc or exe,
                                                       preexec_fn=process.preexec_fn,
-                                                      mapping=str(mapping))
+                                                      mapping=str(mapping),
+                                                      traceFile=traceFile)
         process.startReader(watchDog)
         return process
 
@@ -1845,6 +1977,9 @@ class RemoteProcessController(ProcessController):
             self.terminated = True
             if self.stdout and self.output:
                 print(self.output)
+
+        def teardown(self, current, success):
+            pass
 
     def __init__(self, current, endpoints=None):
         self.processControllerProxies = {}
@@ -1977,8 +2112,7 @@ class AndroidProcessController(RemoteProcessController):
 
     def __init__(self, current):
         run("adb kill-server")
-        RemoteProcessController.__init__(self, current,
-            "tcp -h 127.0.0.1 -p 15001" if current.config.androidemulator else None)
+        RemoteProcessController.__init__(self, current, "tcp -h 127.0.0.1 -p 15001" if current.config.androidemulator else None)
         self.device = current.config.device
         self.avd = current.config.avd
         self.androidemulator = current.config.androidemulator
@@ -2282,44 +2416,42 @@ class UWPProcessController(RemoteProcessController):
 class BrowserProcessController(RemoteProcessController):
 
     def __init__(self, current):
-        RemoteProcessController.__init__(self, current, "ws -h 127.0.0.1 -p 15002:wss -h 127.0.0.1 -p 15003")
+        self.host = current.driver.host or "127.0.0.1"
+        RemoteProcessController.__init__(self, current, "ws -h {0} -p 15002:wss -h {0} -p 15003".format(self.host))
         self.httpServer = None
-        self.testcase = None
+        self.url = None
+        self.driver = None
         try:
-            from selenium import webdriver
-            if not hasattr(webdriver, current.config.browser):
-                raise RuntimeError("unknown browser `{0}'".format(current.config.browser))
-
-            if current.config.browser == "Firefox":
-                #
-                # We need to specify a profile for Firefox. This profile only provides the cert8.db which
-                # contains our Test CA cert. It should be possible to avoid this by setting the webdriver
-                # acceptInsecureCerts capability but it's only supported by latest Firefox releases.
-                #
-                # capabilities = webdriver.DesiredCapabilities.FIREFOX.copy()
-                # capabilities["marionette"] = True
-                # capabilities["acceptInsecureCerts"] = True
-                # capabilities["moz:firefoxOptions"] = {}
-                # capabilities["moz:firefoxOptions"]["binary"] = "/Applications/FirefoxNightly.app/Contents/MacOS/firefox-bin"
-                if isinstance(platform, Linux) and os.environ.get("DISPLAY", "") != ":1" and os.environ.get("USER", "") == "ubuntu":
-                    current.writeln("error: DISPLAY is unset, setting it to :1")
-                    os.environ["DISPLAY"] = ":1"
-
-                profile = webdriver.FirefoxProfile(os.path.join(toplevel, "scripts", "selenium", "firefox"))
-                self.driver = webdriver.Firefox(firefox_profile=profile)
-            else:
-                self.driver = getattr(webdriver, current.config.browser)()
-
             cmd = "node -e \"require('./bin/HttpServer')()\"";
             cwd = current.testcase.getMapping().getPath()
             self.httpServer = Expect.Expect(cmd, cwd=cwd)
             self.httpServer.expect("listening on ports")
+
+            if current.config.browser != "Manual":
+                from selenium import webdriver
+                if not hasattr(webdriver, current.config.browser):
+                    raise RuntimeError("unknown browser `{0}'".format(current.config.browser))
+
+                if current.config.browser == "Firefox":
+                    if isinstance(platform, Linux) and os.environ.get("DISPLAY", "") != ":1" and os.environ.get("USER", "") == "ubuntu":
+                        current.writeln("error: DISPLAY is unset, setting it to :1")
+                        os.environ["DISPLAY"] = ":1"
+
+                    #
+                    # We need to specify a profile for Firefox. This profile only provides the cert8.db which
+                    # contains our Test CA cert. It should be possible to avoid this by setting the webdriver
+                    # acceptInsecureCerts capability but it's only supported by latest Firefox releases.
+                    #
+                    profile = webdriver.FirefoxProfile(os.path.join(toplevel, "scripts", "selenium", "firefox"))
+                    self.driver = webdriver.Firefox(firefox_profile=profile)
+                else:
+                    self.driver = getattr(webdriver, current.config.browser)()
         except:
             self.destroy(current.driver)
             raise
 
     def __str__(self):
-        return str(self.driver)
+        return str(self.driver) if self.driver else "Manual"
 
     def getControllerIdentity(self, current):
         #
@@ -2327,22 +2459,47 @@ class BrowserProcessController(RemoteProcessController):
         # another testcase, the controller page will connect to the process controller registry
         # to register itself with this script.
         #
-        if self.testcase != current.testcase:
-            self.testcase = current.testcase
-            testsuite = ("es5/" if current.config.es5 else "") + str(current.testsuite)
-            if current.config.protocol == "wss":
-                protocol = "https"
-                port = "9090"
-                cport = "15003"
+        testsuite = ("es5/" if current.config.es5 else "") + str(current.testsuite)
+        if current.config.protocol == "wss":
+            protocol = "https"
+            port = "9090"
+            cport = "15003"
+        else:
+            protocol = "http"
+            port = "8080"
+            cport = "15002"
+        url = "{0}://{5}:{1}/test/{2}/controller.html?port={3}&worker={4}".format(protocol,
+                                                                                  port,
+                                                                                  testsuite,
+                                                                                  cport,
+                                                                                  current.config.worker,
+                                                                                  self.host)
+        if url != self.url:
+            self.url = url
+            if self.driver:
+                self.driver.get(url)
             else:
-                protocol = "http"
-                port = "8080"
-                cport = "15002"
-            self.driver.get("{0}://127.0.0.1:{1}/test/{2}/controller.html?port={3}&worker={4}".format(protocol,
-                                                                                                      port,
-                                                                                                      testsuite,
-                                                                                                      cport,
-                                                                                                      current.config.worker))
+                # If not process controller is registered, we request the user to load the controller
+                # page in the browser. Once loaded, the controller will register and we'll redirect to
+                # the correct testsuite page.
+                ident = current.driver.getCommunicator().stringToIdentity("Browser/ProcessController")
+                prx = None
+                with self.cond:
+                    while True:
+                        if ident in self.processControllerProxies:
+                            prx = self.processControllerProxies[ident]
+                            break
+                        print("Please load http://{0}:8080/start".format(self.host))
+                        self.cond.wait(5)
+
+                try:
+                    import Test
+                    Test.Common.BrowserProcessControllerPrx.uncheckedCast(prx).redirect(url)
+                except:
+                    pass
+                finally:
+                    self.clearProcessController(prx, prx.ice_getCachedConnection())
+
         return "Browser/ProcessController"
 
     def destroy(self, driver):
@@ -2363,6 +2520,7 @@ class Driver:
             self.driver = driver
             self.testsuite = testsuite
             self.config = driver.configs[testsuite.getMapping()]
+            self.desc = ""
             self.result = result
             self.host = None
             self.testcase = None
@@ -2451,7 +2609,7 @@ class Driver:
     @classmethod
     def getSupportedArgs(self):
         return ("dlrR", ["debug", "driver=", "filter=", "rfilter=", "host=", "host-ipv6=", "host-bt=", "interface=",
-                         "controller-app", "valgrind"])
+                         "controller-app", "valgrind", "languages="])
 
     @classmethod
     def usage(self):
@@ -2465,6 +2623,7 @@ class Driver:
         print("--driver=<driver>     Use the given driver (local, client, server or remote).")
         print("--filter=<regex>      Run all the tests that match the given regex.")
         print("--rfilter=<regex>     Run all the tests that do not match the given regex.")
+        print("--languages=l1,l2,... List of comma-separated language mappings to test.")
         print("--host=<addr>         The IPv4 address to use for Ice.Default.Host.")
         print("--host-ipv6=<addr>    The IPv6 address to use for Ice.Default.Host.")
         print("--host-bt=<addr>      The Bluetooth address to use for Ice.Default.Host.")
@@ -2481,6 +2640,7 @@ class Driver:
         self.hostBT = ""
         self.controllerApp = False
         self.valgrind = False
+        self.languages = []
 
         self.failures = []
         parseOptions(self, options, { "d": "debug",
@@ -2494,6 +2654,8 @@ class Driver:
 
         self.filters = [re.compile(a) for a in self.filters]
         self.rfilters = [re.compile(a) for a in self.rfilters]
+        if self.languages:
+            self.languages = [i for sublist in [l.split(",") for l in self.languages] for i in sublist]
 
         self.communicator = None
         self.interface = ""
@@ -2503,12 +2665,18 @@ class Driver:
         self.configs = configs
 
     def useIceBinDist(self, mapping):
-        env = os.environ.get("ICE_BIN_DIST", "").split()
-        return 'all' in env or mapping.name in env
+        return self.useBinDist(mapping, "ICE_BIN_DIST")
 
     def getIceDir(self, mapping, current):
-        if self.useIceBinDist(mapping):
-            return platform.getIceInstallDir(mapping, current)
+        return self.getInstallDir(mapping, current, "ICE_HOME", "ICE_BIN_DIST")
+
+    def useBinDist(self, mapping, envName):
+        env = os.environ.get(envName, "").split()
+        return 'all' in env or mapping.name in env
+
+    def getInstallDir(self, mapping, current, envHomeName, envBinDistName):
+        if self.useBinDist(mapping, envBinDistName):
+            return platform.getInstallDir(mapping, current, envHomeName)
         elif mapping:
             return mapping.getPath()
         else:
@@ -2542,6 +2710,9 @@ class Driver:
     def getMappings(self):
         ### Return additional mappings to load required by the driver
         return []
+
+    def getLanguages(self):
+        return self.languages
 
     def getCommunicator(self):
         self.initCommunicator()
@@ -3246,12 +3417,16 @@ class JavaScriptMapping(Mapping):
 
         return options
 
-from Glacier2Util import *
-from IceBoxUtil import *
-from IceBridgeUtil import *
-from IcePatch2Util import *
-from IceGridUtil import *
-from IceStormUtil import *
+try:
+    from Glacier2Util import *
+    from IceBoxUtil import *
+    from IceBridgeUtil import *
+    from IcePatch2Util import *
+    from IceGridUtil import *
+    from IceStormUtil import *
+except ImportError:
+    pass
+
 from LocalDriver import *
 
 #
@@ -3267,7 +3442,7 @@ except:
 #
 # Supported mappings
 #
-for m in filter(lambda x: os.path.isdir(os.path.join(toplevel, x)),  os.listdir(toplevel)):
+for m in filter(lambda x: os.path.isdir(os.path.join(toplevel, x)), os.listdir(toplevel)):
     if m == "cpp" or re.match("cpp-.*", m):
         Mapping.add(m, CppMapping())
     elif m == "java-compat" or re.match("java-compat-.*", m):
@@ -3311,7 +3486,7 @@ def runTests(mappings=None, drivers=None):
             driver.usage()
 
         Mapping.Config.commonUsage()
-        for mapping in Mapping.getAll():
+        for mapping in mappings:
             mapping.Config.usage()
 
         print("")
@@ -3346,6 +3521,12 @@ def runTests(mappings=None, drivers=None):
         for mapping in Mapping.getAll():
             if mapping not in configs:
                 configs[mapping] = mapping.createConfig(opts[:])
+
+        #
+        # If the user specified --languages, only run matching mappings.
+        #
+        if driver.getLanguages():
+            mappings = [Mapping.getByName(l) for l in driver.getLanguages()]
 
         #
         # Provide the configurations to the driver and load the test suites for each mapping.

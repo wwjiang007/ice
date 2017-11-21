@@ -13,12 +13,12 @@
     <PropertyGroup Condition="'$(PlatformToolset)' == 'v100'">
         <IceConfiguration Condition="'$(UseDebugLibraries)' == 'true'">Debug</IceConfiguration>
         <IceConfiguration Condition="'$(UseDebugLibraries)' != 'true'">Release</IceConfiguration>
-        <LocalDebuggerEnvironment>PATH=$(MSBuildThisFileDirectory)bin\$(Platform)\$(IceConfiguration);$(IceToolsPath);$(Path)</LocalDebuggerEnvironment>
+        <LocalDebuggerEnvironment>PATH=$(MSBuildThisFileDirectory)bin\$(Platform)\$(IceConfiguration)</LocalDebuggerEnvironment>
     </PropertyGroup>
 
     <ItemDefinitionGroup Condition="'$(PlatformToolset)' == 'v100'">
         <Link>
-            <AdditionalLibraryDirectories>$(MSBuildThisFileDirectory)lib\$(Platform)\$(IceConfiguration);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+            <AdditionalLibraryDirectories>$(MSBuildThisFileDirectory)lib\$(Platform)\Release;$(MSBuildThisFileDirectory)lib\$(Platform)\Debug;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
         </Link>
     </ItemDefinitionGroup>
 

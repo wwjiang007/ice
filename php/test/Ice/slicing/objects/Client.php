@@ -125,8 +125,8 @@ function allTests($communicator)
             $o = $test->SUnknownAsObject();
             test($test->ice_getEncodingVersion() != $Ice_Encoding_1_0);
             test($o instanceof $usocls);
-            test($o->unknownTypeId == "::Test::SUnknown");
-            test($o->_ice_slicedData != null);
+            test($o->ice_id() == "::Test::SUnknown");
+            test($o->ice_getSlicedData() != null);
             $test->checkSUnknown($o);
         }
         catch(Exception $b)
@@ -1017,7 +1017,14 @@ function allTests($communicator)
         $test->checkPBSUnknown($p);
         if($test->ice_getEncodingVersion() != $Ice_Encoding_1_0)
         {
+            $slicedData = $p->ice_getSlicedData();
+            test(count($slicedData->slices) == 1);
+            test($slicedData->slices[0]->typeId == "::Test::PSUnknown");
             $test->ice_encodingVersion($Ice_Encoding_1_0)->checkPBSUnknown($p);
+        }
+        else
+        {
+            test(!$p->ice_getSlicedData());
         }
 
         //

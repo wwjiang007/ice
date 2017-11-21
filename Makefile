@@ -32,30 +32,16 @@ $(eval $(call make-global-rule,install,$(languages)))
 #
 install:: install-doc install-slice
 
-$(eval $(call install-data-files,$(filter-out %Discovery.ice,$(wildcard $(slicedir)/*/*.ice)),$(slicedir),$(install_slicedir),\
-         install-slice,"Installing slice files"))
-
 $(eval $(call install-data-files,$(wildcard $(top_srcdir)/*LICENSE),$(top_srcdir),$(install_docdir),\
          install-doc,"Installing documentation files"))
 
-#
-# Create a symlink for the slice directory. We skip this step on macOS
-#
-ifneq ($(usr_dir_install),)
-ifeq ($(filter Darwin,$(os)),)
-
-install-slice:: $(DESTDIR)$(prefix)/share/slice
-
-$(DESTDIR)$(prefix)/share/slice:
-	$(foreach dir,$(notdir $(wildcard slice/*)), \
-		$(shell $(MKDIR) -p $(DESTDIR)$(prefix)/share/slice && cd $(DESTDIR)$(prefix)/share/slice && ln -sf ../ice/slice/$(dir) .))
-endif
-endif
+$(eval $(call install-data-files,$(filter-out %Discovery.ice,$(wildcard $(slicedir)/*/*.ice)),$(slicedir),$(install_slicedir),\
+         install-slice,"Installing slice files"))
 
 #
-# Remove IceSDK directory on macOS
+# Remove top-level sdk directory on macOS
 #
 ifneq ($(filter Darwin,$(os)),)
 distclean::
-	$(Q)$(RM) -r $(top_srcdir)/IceSDK
+	$(Q)$(RM) -r $(top_srcdir)/sdk
 endif

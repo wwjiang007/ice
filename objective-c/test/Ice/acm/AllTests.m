@@ -178,6 +178,7 @@
 
     _cond = [[NSCondition alloc] init];
     _logger = [[LoggerI alloc] init];
+    _thread = nil;
 
     _clientACMTimeout = -1;
     _clientACMClose = -1;
@@ -196,6 +197,7 @@
 {
     [_cond release];
     [_logger release];
+    [_thread release];
     [super dealloc];
 }
 #endif
@@ -358,6 +360,7 @@
 {
     [_cond lock];
     [_test run];
+    _test = nil; // Break cyclic reference count
     _called = YES;
     [_cond signal];
     [_cond unlock];
@@ -397,7 +400,7 @@
     [_cond lock];
     @try
     {
-        test(_heartbeat >= 2);
+        test(_heartbeat >= 6);
     }
     @finally
     {

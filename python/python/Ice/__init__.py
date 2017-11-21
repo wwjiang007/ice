@@ -326,7 +326,8 @@ _struct_marker = object()
 # Core Ice types.
 #
 class Value(object):
-    def ice_id():
+
+    def ice_id(self):
         '''Obtains the type id corresponding to the most-derived Slice
 interface supported by the target object.
 Returns:
@@ -351,6 +352,14 @@ Returns:
     #def ice_postUnmarshal(self):
     #    pass
 
+    def ice_getSlicedData(self):
+        '''Returns the sliced data if the value has a preserved-slice base class and has been sliced during
+un-marshaling of the value, null is returned otherwise.
+Returns:
+    The sliced data or null.
+'''
+        return getattr(self, "_ice_slicedData", None);
+
 class InterfaceByValue(Value):
 
     def __init__(self, id):
@@ -360,6 +369,7 @@ class InterfaceByValue(Value):
         return self.id
 
 class Object(object):
+
     def ice_isA(self, id, current=None):
         '''Determines whether the target object supports the interface denoted
 by the given Slice type id.
@@ -457,12 +467,15 @@ class BlobjectAsync(Object):
     '''Special-purpose servant base class that allows a subclass to
 handle asynchronous Ice invocations as "blobs" of bytes.'''
 
-    def ice_invoke_async(self, cb, bytes, current):
+    def ice_invoke(self, bytes, current):
         '''Dispatch an asynchronous Ice invocation. The operation's
-arguments are encoded in the bytes argument. When the
-dispatch is complete, the subclass can invoke either
-ice_response or ice_exception on the supplied callback
-object.
+arguments are encoded in the bytes argument. The result must be
+a tuple of two values: the first is a boolean indicating whether the
+operation succeeded (True) or raised a user exception (False), and
+the second is the encoded form of the operation's results or the user
+exception. The subclass can either return the tuple directly (for
+synchronous completion) or return a future that is eventually
+completed with the tuple.
 '''
         pass
 
@@ -489,7 +502,14 @@ class LocalException(Exception):
 
 class UserException(Exception):
     '''The base class for all user-defined exceptions.'''
-    pass
+
+    def ice_getSlicedData(self):
+        '''Returns the sliced data if the value has a preserved-slice base class and has been sliced during
+un-marshaling of the value, null is returned otherwise.
+Returns:
+    The sliced data or null.
+'''
+        return getattr(self, "_ice_slicedData", None);
 
 class EnumBase(object):
     def __init__(self, _n, _v):
@@ -590,7 +610,9 @@ class UnknownSlicedValue(Value):
     # Members:
     #
     # unknownTypeId - string
-    pass
+
+    def ice_id(self):
+        return self.unknownTypeId
 
 def getSliceDir():
     '''Convenience function for locating the directory containing the Slice files.'''
@@ -718,7 +740,7 @@ FormatType.SlicedFormat = FormatType(2)
 IcePy._t_Object = IcePy.declareClass('::Ice::Object')
 IcePy._t_Value = IcePy.declareValue('::Ice::Object')
 IcePy._t_ObjectPrx = IcePy.declareProxy('::Ice::Object')
-IcePy._t_LocalObject = IcePy.declareClass('::Ice::LocalObject')
+IcePy._t_LocalObject = IcePy.declareValue('::Ice::LocalObject')
 
 #
 # Sequence mappings.

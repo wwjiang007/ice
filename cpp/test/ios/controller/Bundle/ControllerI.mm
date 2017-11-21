@@ -129,6 +129,7 @@ MainHelperI::~MainHelperI()
     if(_handle)
     {
         CFBundleUnloadExecutable(_handle);
+        CFRelease(_handle);
     }
 }
 
@@ -194,13 +195,14 @@ MainHelperI::run()
     }
 
     //
-    // The first CFBundleGetFunction... does not always succeed, so we make up to 3 attempts
+    // The first CFBundleGetFunction... does not always succeed, so we make up to 5 attempts
     //
     void* sym = 0;
     int attempts = 0;
-    while((sym = CFBundleGetFunctionPointerForName(_handle, CFSTR("dllTestShutdown"))) == 0 && attempts < 3)
+    while((sym = CFBundleGetFunctionPointerForName(_handle, CFSTR("dllTestShutdown"))) == 0 && attempts < 5)
     {
         attempts++;
+        [NSThread sleepForTimeInterval:0.2];
     }
 
     if(sym == 0)
@@ -212,9 +214,9 @@ MainHelperI::run()
         return;
     }
     /*
-    else
+    else if(attempts > 0)
     {
-        print([[NSString stringWithFormat:@"*** found dllTestShutdown after %d failed attempt(s)", attempts] UTF8String]);
+        print([[NSString stringWithFormat:@"************ found dllTestShutdown after %d failed attempt(s)", attempts] UTF8String]);
     }
     */
 
@@ -345,7 +347,12 @@ ProcessControllerI::start(const string& testSuite, const string& exe, const Stri
     replace(prefix.begin(), prefix.end(), '/', '_');
     [_controller println:[NSString stringWithFormat:@"starting %s %s... ", testSuite.c_str(), exe.c_str()]];
     IceUtil::Handle<MainHelperI> helper = new MainHelperI(_controller, prefix + '/' + exe + ".bundle", args);
-    helper->start();
+
+    //
+    // Use a 768KB thread stack size for the objects test. This is necessary when running the
+    // test on arm64 devices with a debug Ice libraries which require lots of stack space.
+    //
+    helper->start(768 * 1024);
     return ICE_UNCHECKED_CAST(ProcessPrx, c.adapter->addWithUUID(ICE_MAKE_SHARED(ProcessI, _controller, helper.get())));
 }
 

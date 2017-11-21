@@ -671,11 +671,10 @@ class ConnectionI
 
         if(this._adapter !== null)
         {
+            //
+            // The OA's servant manager is immutable.
+            //
             this._servantManager = this._adapter.getServantManager();
-            if(this._servantManager === null)
-            {
-                this._adapter = null;
-            }
         }
         else
         {
@@ -1946,7 +1945,7 @@ class ConnectionI
                 // Attempt to log the error and clean up.
                 //
                 this._logger.error("unexpected exception:\n" + ex.toString());
-                this.invokeException(requestId, new Ice.UnknownException(ex), invokeNum, false);
+                this.invokeException(new Ice.UnknownException(ex), invokeNum);
             }
         }
     }

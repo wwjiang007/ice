@@ -91,6 +91,7 @@ TestI::SUnknownAsObjectAsync(function<void(const shared_ptr<Ice::Value>&)> respo
 {
     auto su = make_shared<SUnknown>();
     su->su = "SUnknown.su";
+    su->cycle = su;
     response(su);
 }
 
@@ -719,6 +720,10 @@ TestI::SUnknownAsObject_async(const AMD_TestIntf_SUnknownAsObjectPtr& cb, const 
 {
     SUnknownPtr su = new SUnknown;
     su->su = "SUnknown.su";
+    su->cycle = su;
+#ifndef ICE_CPP11_MAPPING
+    su->ice_collectable(true);
+#endif
     cb->ice_response(su);
 }
 

@@ -8,6 +8,8 @@ We recommend that you use the release notes as a guide for migrating your
 applications to this release, and the manual for complete details on a
 particular aspect of Ice.
 
+- [Changes in Ice 3.7.1 (Pre-Release Snapshot)](#changes-in-ice-371-pre-release-snapshot)
+  - [General Changes](#general-changes)
 - [Changes in Ice 3.7.0](#changes-in-ice-370)
   - [General Changes](#general-changes)
   - [C++ Changes](#c-changes)
@@ -19,12 +21,41 @@ particular aspect of Ice.
   - [Python Changes](#python-changes)
   - [Ruby Changes](#ruby-changes)
 
+# Changes in Ice 3.7.1 (Pre-Release Snapshot)
+
+These are the changes since Ice 3.7.0 included in this pre-release.
+
+## General Changes
+
+- Fixed IceGrid node bug where a replica would not get up-to-date object
+  adapter information about a server if an update was pending for the
+  server. Thanks to Michael Gmelin for the bug report and fix.
+
+## PHP Changes
+
+- Fixed Ice for PHP build failure when build with PHP5 ZTS
+
+## Objective-C Changes
+
+- Fixed the generated code to specify the __autoreleasing qualifier on
+  parameters returned by reference. Xcode 9.0 now emits a warning if this
+  qualifier is omitted.
+
 # Changes in Ice 3.7.0
 
 These are the changes since the Ice 3.6 release or snapshot described in
 [CHANGELOG-3.6.md](./CHANGELOG-3.6.md).
 
 ## General Changes
+
+- Added `ice_getSlicedData` method to the `Value` and `UserException` base
+  classes. This method can be used to obtain the sliced data when available.
+
+- Fixed IceGrid inconsistency when resolving dynamically registered replica
+  group endpoints. Like for replica group registered with descriptors, if the
+  replica group members don't support the encoding requested by the client, the
+  client will raise `Ice::NoEndpointException` instead of
+  `Ice::NotRegisteredException`.
 
 - Defining operations on non-local classes is now deprecated: operations should
   be defined only on interfaces and local classes. Likewise, having a class
@@ -304,6 +335,11 @@ These are the changes since the Ice 3.6 release or snapshot described in
 
 ## C++ Changes
 
+- Added `Ice::SlicedData::clear` method to allow clearing the slices associated
+  with the slice data. Calling `clear` can be useful if the sliced data contains
+  cycles. You should call this method if your application receives sliced values
+  which might contain cycles.
+
 - Added a new C++11 mapping that takes advantage of C++11 language features. This
   new mapping is very different from the Slice-to-C++ mapping provided in prior
   releases. The old mapping, now known as the C++98 mapping, is still supported
@@ -480,6 +516,11 @@ These are the changes since the Ice 3.6 release or snapshot described in
   the use of `Uint8Array`.
 
 ## Objective-C Changes
+
+- Added clear selector to `ICESlicedData` to allow clearing the slices
+  associated with the slice data. Calling `clear` can be useful if the sliced
+  data contains cycles. You should call this method if your application receives
+  sliced values which might contain cycles.
 
 - The UDP and WS transports are no longer enabled by default with static builds
   of the IceObjC library. You need to register them explicitly with the

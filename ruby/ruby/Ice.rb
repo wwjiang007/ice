@@ -136,6 +136,10 @@ module Ice
             self::ICE_ID
         end
 
+        def ice_getSlicedData()
+            return _ice_slicedData
+        end
+
         attr_accessor :_ice_slicedData  # Only used for instances of preserved classes.
     end
 
@@ -157,7 +161,9 @@ module Ice
     # UnknownSlicedValue.
     #
     class UnknownSlicedValue < Value
-        attr_accessor :unknownTypeId
+        def ice_id
+            return @unknownTypeId
+        end
     end
     T_UnknownSlicedValue = Ice.__declareClass('::Ice::UnknownSlicedValue')
     T_UnknownSlicedValue.defineClass(UnknownSlicedValue, -1, true, false, T_Value, [])

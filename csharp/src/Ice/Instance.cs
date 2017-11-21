@@ -797,11 +797,6 @@ namespace IceInternal
                         _initData.logger =
                             new Ice.TraceLoggerI(_initData.properties.getProperty("Ice.ProgramName"), console);
                     }
-
-                    if(Ice.Util.getProcessLogger() is Ice.LoggerI)
-                    {
-                        _initData.logger = new Ice.ConsoleLoggerI(_initData.properties.getProperty("Ice.ProgramName"));
-                    }
                     else
                     {
                         _initData.logger = Ice.Util.getProcessLogger();
@@ -1230,10 +1225,12 @@ namespace IceInternal
                 _initData.observer.setObserverUpdater(null);
             }
 
-            LoggerAdminLogger logger = _initData.logger as LoggerAdminLogger;
-            if(logger != null)
             {
-                logger.destroy();
+                LoggerAdminLogger logger = _initData.logger as LoggerAdminLogger;
+                if(logger != null)
+                {
+                    logger.destroy();
+                }
             }
 
             //
@@ -1354,6 +1351,14 @@ namespace IceInternal
 
                 _state = StateDestroyed;
                 Monitor.PulseAll(this);
+            }
+
+            {
+                Ice.FileLoggerI logger = _initData.logger as Ice.FileLoggerI;
+                if(logger != null)
+                {
+                    logger.destroy();
+                }
             }
         }
 

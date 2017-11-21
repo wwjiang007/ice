@@ -3,11 +3,11 @@
 This file describes how to build Ice for C++ from sources on Windows and how
 to test the resulting build.
 
-ZeroC provides [Ice binary distributions][1] for various platforms and compilers,
-including Windows and Visual Studio, so building Ice from sources is usually
-unnecessary.
+ZeroC provides [Ice binary distributions][1] for various platforms and
+compilers, including Windows and Visual Studio, so building Ice from sources is
+usually unnecessary.
 
-## Build Requirements
+## C++ Build Requirements
 
 ### Operating Systems and Compilers
 
@@ -33,7 +33,7 @@ The Ice build system for Windows downloads and installs the NuGet command-line
 executable and these NuGet packages when you build Ice for C++. The third-party
 packages are installed in the ``ice/cpp/msbuild/packages`` folder.
 
-## Building Ice for C++
+## Building Ice
 
 Open a Visual Studio command prompt. For example, with Visual Studio 2015, you
 can open one of:
@@ -75,26 +75,16 @@ To build the test suite using the NuGet binary distribution use:
 
     msbuild msbuild\ice.proj /p:ICE_BIN_DIST=all
 
-If you want to build all supported platforms and configurations at once, use:
-
-    msbuild msbuild\ice.proj /p:BuildAllConfigurations=yes
-
 You can also sign the Ice binaries with Authenticode, by setting the following
 environment variables:
+
  - SIGN_CERTIFICATE to your Authenticode certificate
  - SIGN_PASSWORD to the certificate password
 
-If you want to run the test suite without building the entire source base, use this
-command:
-
-    msbuild msbuild\ice.proj /p:ICE_BIN_DIST=all
-
-The build will automatically install ZeroC's official Ice binary NuGet packages if necessary.
-
 ## Building Ice for UWP
 
-The steps are the same as for Building Ice for C++ above, except you must also use a
-`UWP` target.
+The steps are the same as for Building Ice for C++ above, except you must also
+use a `UWP` target.
 
 To build Ice for UWP:
 
@@ -103,10 +93,6 @@ To build Ice for UWP:
 To skip the building of the test suite:
 
     msbuild msbuild\ice.proj /t:UWPBuildDist
-
-To build all configurations:
-
-    msbuild msbuild\ice.proj /t:UWPBuildDist /p:BuildAllConfigurations=yes
 
 To build the test suite using the NuGet binary distribution use:
 
@@ -118,17 +104,22 @@ You can create a NuGet package with the following command:
 
     msbuild msbuild\ice.proj /t:NuGetPack /p:BuildAllConfigurations=yes
 
-This creates zeroc.ice.v120\zeroc.ice.v120.nupkg`, `zeroc.ice.v140\zeroc.ice.v140.nupkg` or
-`zeroc.ice.v141\zeroc.ice.v141.nupkg` depending on the compiler you are using.
+This creates `zeroc.ice.v100\zeroc.ice.v100.nupkg`,
+`zeroc.ice.v120\zeroc.ice.v120.nupkg`, `zeroc.ice.v140\zeroc.ice.v140.nupkg` or
+`zeroc.ice.v141\zeroc.ice.v141.nupkg`
+depending on the compiler you are using.
 
 To create UWP NuGet packages, use the `UWPNuGetPack` target instead:
 
     msbuild msbuild\ice.proj /t:UWPNuGetPack /p:BuildAllConfigurations=yes
 
-This creates `zeroc.ice.uwp.v140\zeroc.ice.uwp.v140.nupkg`, `zeroc.ice.uwp.v140.x64\zeroc.ice.uwp.v140.x64.nupkg`
-and `zeroc.ice.uwp.v140.x86\zeroc.ice.uwp.v140.x86.nupkg` for Visual Studio 2015 builds or
-`zeroc.ice.uwp.v140\zeroc.ice.uwp.v140.nupkg`, `zeroc.ice.uwp.v140.x64\zeroc.ice.uwp.v140.x64.nupkg` and
-`zeroc.ice.uwp.v140.x86\zeroc.ice.uwp.v140.x86.nupkg` for Visual Studio 2017 builds.
+This creates: `zeroc.ice.uwp.v140\zeroc.ice.uwp.v140.nupkg`,
+`zeroc.ice.uwp.v140.x64\zeroc.ice.uwp.v140.x64.nupkg` and
+`zeroc.ice.uwp.v140.x86\zeroc.ice.uwp.v140.x86.nupkg` for Visual Studio 2015
+builds or `zeroc.ice.uwp.v140\zeroc.ice.uwp.v140.nupkg`,
+`zeroc.ice.uwp.v140.x64\zeroc.ice.uwp.v140.x64.nupkg` and
+`zeroc.ice.uwp.v140.x86\zeroc.ice.uwp.v140.x86.nupkg` for Visual Studio 2017
+builds.
 
 ## Running the Test Suite
 
@@ -141,7 +132,8 @@ After a successful source build, you can run the tests as follows:
 
     python allTests.py
 
-For the C++11 mapping you need to use the `Cpp11-Debug` or `Cpp11-Release` configuration:
+For the C++11 mapping you need to use the `Cpp11-Debug` or `Cpp11-Release`
+configuration:
 
     python allTests.py --config Cpp11-Debug
 
@@ -155,15 +147,15 @@ require the Python module `passlib`, which you can install with the command:
 
     pip install passlib
 
-The scripts also require Ice for Python, you can build Ice for Python from [python](../python)
-folder of this source distribution or install the Python module `zeroc-ice`,  using the
-following command:
+The scripts also require Ice for Python, you can build Ice for Python from
+[python](../python) folder of this source distribution or install the Python
+module `zeroc-ice`,  using the following command:
 
     pip install zeroc-ice
 
 You can run the testsuite from the console using python:
 
-    python allTest.py --uwp --controller-app --platform x64 --config Release
+    python allTests.py --uwp --controller-app --platform x64 --config Release
 
 If everything worked out, you should see lots of `ok` messages. In case of a
 failure, the tests abort with `failed`.

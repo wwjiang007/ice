@@ -15,7 +15,7 @@
     <IceTestSolution>ice.test.sln</IceTestSolution>
     <IceTestSolution Condition="'$(VisualStudioVersion)' == '10.0'">ice.test.v100.sln</IceTestSolution>
     <IceConfiguration>$(Configuration)</IceConfiguration>
-    <SymbolServer Condition="'$(SymbolServer)' == ''">https://symbols.zeroc.com</SymbolServer>
+    <SymbolServer Condition="'$(SymbolServer)' == ''">SRV*%TEMP%\SymbolCache*https://symbols.zeroc.com</SymbolServer>
   </PropertyGroup>
 
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
@@ -55,8 +55,11 @@
   </Target>
 
   <Target Name="DownloadSymbols" DependsOnTargets="TestNuGetRestore" Condition="'$(ICE_BIN_DIST)' == 'all'">
-    <MakeDir Directories="$(TEMP)\SymbolCache" />
-    <Exec Command="symchk /r $(MSBuildThisFileDirectory)packages\zeroc.ice.$(DefaultPlatformToolset).$(IceJSONVersion)\build\native\bin\$(Platform)\$(IceConfiguration)\* /s SRV*$(TEMP)\SymbolCache*$(SymbolServer)" />
+    <Exec IgnoreExitCode="True"
+          Command="symchk /r $(MSBuildThisFileDirectory)packages\zeroc.ice.$(DefaultPlatformToolset).$(IceJSONVersion)\build\native\bin\$(Platform)\$(IceConfiguration)\* /s $(SymbolServer)">
+          <Output TaskParameter="ExitCode" PropertyName="ErrorCode"/>
+    </Exec>
+    <Warning  Text="PDBs download failed, stack traces might be missing or incomplete" Condition="'$(ErrorCode)' != '0'" />
   </Target>
 
   <!-- Ice for C++ builds. -->
@@ -133,34 +136,34 @@
 
        <!-- OpenSSL C++ test configurations (C++98 mapping) -->
       <ItemGroup Condition="'$(ICE_BIN_DIST)' != 'all' and '$(OpenSSL)' == 'yes'">
-        <TestSolution Include="ice.openssl.test.sln">
+        <OpenSSLTestSolution Include="ice.openssl.test.sln">
           <Properties>Configuration=Debug;Platform=Win32</Properties>
-        </TestSolution>
-        <TestSolution Include="ice.openssl.test.sln">
+        </OpenSSLTestSolution>
+        <OpenSSLTestSolution Include="ice.openssl.test.sln">
           <Properties>Configuration=Debug;Platform=x64</Properties>
-        </TestSolution>
-        <TestSolution Include="ice.openssl.test.sln">
+        </OpenSSLTestSolution>
+        <OpenSSLTestSolution Include="ice.openssl.test.sln">
           <Properties>Configuration=Release;Platform=Win32</Properties>
-        </TestSolution>
-        <TestSolution Include="ice.openssl.test.sln">
+        </OpenSSLTestSolution>
+        <OpenSSLTestSolution Include="ice.openssl.test.sln">
           <Properties>Configuration=Release;Platform=x64</Properties>
-        </TestSolution>
+        </OpenSSLTestSolution>
       </ItemGroup>
 
       <!-- OpenSSL C++ test configurations (C++11 mapping) -->
       <ItemGroup Condition="'$(ICE_BIN_DIST)' != 'all' and $(OpenSSL) == 'yes' and '$(Cpp11Compiler)' == 'yes'">
-        <TestSolution Include="ice.openssl.test.sln">
+        <OpenSSLTestSolution Include="ice.openssl.test.sln">
           <Properties>Configuration=Cpp11-Debug;Platform=Win32</Properties>
-        </TestSolution>
-        <TestSolution Include="ice.openssl.test.sln">
+        </OpenSSLTestSolution>
+        <OpenSSLTestSolution Include="ice.openssl.test.sln">
           <Properties>Configuration=Cpp11-Debug;Platform=x64</Properties>
-        </TestSolution>
-        <TestSolution Include="ice.openssl.test.sln">
+        </OpenSSLTestSolution>
+        <OpenSSLTestSolution Include="ice.openssl.test.sln">
           <Properties>Configuration=Cpp11-Release;Platform=Win32</Properties>
-        </TestSolution>
-        <TestSolution Include="ice.openssl.test.sln">
+        </OpenSSLTestSolution>
+        <OpenSSLTestSolution Include="ice.openssl.test.sln">
           <Properties>Configuration=Cpp11-Release;Platform=x64</Properties>
-        </TestSolution>
+        </OpenSSLTestSolution>
       </ItemGroup>
 
       <!-- Ice for UWP test configurations -->
@@ -280,6 +283,10 @@
     <MSBuild Projects="ice.nuget.targets"
              Properties="Configuration=Release;Platform=x64;PackageDirectory=zeroc.ice.$(DefaultPlatformToolset)" />
 
+    <Copy SourceFiles="$(MSBuildThisFileDirectory)..\..\ICE_LICENSE"
+          DestinationFiles="zeroc.ice.$(DefaultPlatformToolset)\ICE_LICENSE.txt" />
+    <Copy SourceFiles="$(MSBuildThisFileDirectory)..\..\LICENSE"
+          DestinationFiles="zeroc.ice.$(DefaultPlatformToolset)\LICENSE.txt" />
     <Copy SourceFiles="zeroc.ice.$(DefaultPlatformToolset).nuspec"
           DestinationFolder="zeroc.ice.$(DefaultPlatformToolset)" />
     <Copy SourceFiles="zeroc.ice.$(DefaultPlatformToolset).props"
@@ -341,6 +348,10 @@
              Properties="Configuration=Debug;Platform=Win32;PackageDirectory=zeroc.ice.uwp.$(DefaultPlatformToolset).x86" />
     <MSBuild Projects="ice.nuget.uwp.arch.targets"
              Properties="Configuration=Release;Platform=Win32;PackageDirectory=zeroc.ice.uwp.$(DefaultPlatformToolset).x86" />
+    <Copy SourceFiles="$(MSBuildThisFileDirectory)..\..\ICE_LICENSE"
+          DestinationFiles="zeroc.ice.uwp.$(DefaultPlatformToolset).x86\ICE_LICENSE.txt" />
+    <Copy SourceFiles="$(MSBuildThisFileDirectory)..\..\LICENSE"
+          DestinationFiles="zeroc.ice.uwp.$(DefaultPlatformToolset).x86\LICENSE.txt" />
     <Copy SourceFiles="zeroc.ice.uwp.$(DefaultPlatformToolset).x86.nuspec"
           DestinationFolder="zeroc.ice.uwp.$(DefaultPlatformToolset).x86" />
     <Copy SourceFiles="zeroc.ice.uwp.$(DefaultPlatformToolset).targets"
@@ -353,6 +364,10 @@
              Properties="Configuration=Debug;Platform=x64;PackageDirectory=zeroc.ice.uwp.$(DefaultPlatformToolset).x64" />
     <MSBuild Projects="ice.nuget.uwp.arch.targets"
              Properties="Configuration=Release;Platform=x64;PackageDirectory=zeroc.ice.uwp.$(DefaultPlatformToolset).x64" />
+    <Copy SourceFiles="$(MSBuildThisFileDirectory)..\..\ICE_LICENSE"
+          DestinationFiles="zeroc.ice.uwp.$(DefaultPlatformToolset).x64\ICE_LICENSE.txt" />
+    <Copy SourceFiles="$(MSBuildThisFileDirectory)..\..\LICENSE"
+          DestinationFiles="zeroc.ice.uwp.$(DefaultPlatformToolset).x64\LICENSE.txt" />
     <Copy SourceFiles="zeroc.ice.uwp.$(DefaultPlatformToolset).x64.nuspec"
           DestinationFolder="zeroc.ice.uwp.$(DefaultPlatformToolset).x64" />
     <Copy SourceFiles="zeroc.ice.uwp.$(DefaultPlatformToolset).targets"
@@ -363,6 +378,10 @@
     <!-- noarch package -->
     <MSBuild Projects="ice.nuget.uwp.targets"
              Properties="PackageDirectory=zeroc.ice.uwp.$(DefaultPlatformToolset)" />
+    <Copy SourceFiles="$(MSBuildThisFileDirectory)..\..\ICE_LICENSE"
+          DestinationFiles="zeroc.ice.uwp.$(DefaultPlatformToolset)\ICE_LICENSE.txt" />
+    <Copy SourceFiles="$(MSBuildThisFileDirectory)..\..\LICENSE"
+          DestinationFiles="zeroc.ice.uwp.$(DefaultPlatformToolset)\LICENSE.txt" />
     <Copy SourceFiles="zeroc.ice.uwp.$(DefaultPlatformToolset).nuspec"
           DestinationFolder="zeroc.ice.uwp.$(DefaultPlatformToolset)" />
     <Copy SourceFiles="zeroc.ice.uwp.$(DefaultPlatformToolset).props"

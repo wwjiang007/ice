@@ -54,7 +54,7 @@
 				"$(DERIVED_FILE_DIR)/$(INPUT_FILE_BASE).cpp",
 				"$(DERIVED_FILE_DIR)/$(INPUT_FILE_BASE).h",
 			);
-			script = "/usr/local/bin/icebuilder --cpp";
+			script = "#export ICE_BIN_DIST=all\n../../../../scripts/ice-builder-xcode-wrapper --cpp";
 		};
 		14E3982D1E01B14B00A89291 /* PBXBuildRule */ = {
 			isa = PBXBuildRule;
@@ -66,7 +66,7 @@
 				"$(DERIVED_FILE_DIR)/$(INPUT_FILE_BASE).cpp",
 				"$(DERIVED_FILE_DIR)/$(INPUT_FILE_BASE).h",
 			);
-			script = "/usr/local/bin/icebuilder --cpp";
+			script = "#export ICE_BIN_DIST=all\n../../../../scripts/ice-builder-xcode-wrapper --cpp";
 		};
 /* End PBXBuildRule section */
 
@@ -607,6 +607,7 @@
 				);
 				INFOPLIST_FILE = Classes/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks";
+				OTHER_CFLAGS = "-fobjc-arc-exceptions";
 				OTHER_LDFLAGS = (
 					"-lIce++11",
 					"-lIceDiscovery++11",
@@ -631,6 +632,7 @@
 				);
 				INFOPLIST_FILE = Classes/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks";
+				OTHER_CFLAGS = "-fobjc-arc-exceptions";
 				OTHER_LDFLAGS = (
 					"-lIce++11",
 					"-lIceDiscovery++11",
@@ -646,7 +648,7 @@
 		14905C661DF98FD8002AE61B /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				ADDITIONAL_SDKS = "../../../../IceSDK/$(PLATFORM_NAME).sdk";
+				ADDITIONAL_SDKS = "../../../../sdk/$(PLATFORM_NAME).sdk";
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				CLANG_ANALYZER_NONNULL = YES;
 				CLANG_CXX_LANGUAGE_STANDARD = "gnu++0x";
@@ -690,7 +692,7 @@
 		14905C671DF98FD8002AE61B /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				ADDITIONAL_SDKS = "../../../../IceSDK/$(PLATFORM_NAME).sdk";
+				ADDITIONAL_SDKS = "../../../../sdk/$(PLATFORM_NAME).sdk";
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				CLANG_ANALYZER_NONNULL = YES;
 				CLANG_CXX_LANGUAGE_STANDARD = "gnu++0x";
@@ -737,6 +739,7 @@
 				DEVELOPMENT_TEAM = U4TBVKNQ7F;
 				INFOPLIST_FILE = Classes/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks";
+				OTHER_CFLAGS = "-fobjc-arc-exceptions";
 				OTHER_LDFLAGS = (
 					"-lIce",
 					"-lIceDiscovery",
@@ -757,6 +760,7 @@
 				DEVELOPMENT_TEAM = U4TBVKNQ7F;
 				INFOPLIST_FILE = Classes/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks";
+				OTHER_CFLAGS = "-fobjc-arc-exceptions";
 				OTHER_LDFLAGS = (
 					"-lIce",
 					"-lIceDiscovery",

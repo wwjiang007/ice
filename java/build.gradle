@@ -39,6 +39,9 @@ subprojects {
 
         mavenCentral()
 
+        //
+        // The thirdparty repository is required on macOS for appblunder
+        //
         maven {
             url 'https://repo.zeroc.com/nexus/content/repositories/thirdparty'
         }
@@ -80,5 +83,5 @@ dist.dependsOn(project(":IceGridGUI").assemble)
 // the version of gradle needed to build Ice.
 //
 task wrapper(type: Wrapper) {
-    gradleVersion = "3.2"
+    gradleVersion = "4.2.1"
 }

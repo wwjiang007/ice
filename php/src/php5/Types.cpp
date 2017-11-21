@@ -2765,7 +2765,7 @@ IcePHP::ProxyInfo::define(zval* b, zval* i TSRMLS_DC)
 {
     if(b)
     {
-        TypeInfoPtr p = Wrapper<TypeInfoPtr>::value(b);
+        TypeInfoPtr p = Wrapper<TypeInfoPtr>::value(b TSRMLS_CC);
         const_cast<ProxyInfoPtr&>(base) = ProxyInfoPtr::dynamicCast(p);
         assert(base);
     }
